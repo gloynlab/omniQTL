@@ -114,31 +114,66 @@ class CAQTL(QTL, SeqQC):
                             sample = f.split('/')[1]
                             out.write(f'ln {f} {ot}/{sample}.json\n')
 
-    def get_concensus_peaks(self, in_dir='peaks_qvalue', out_file='ATACseq_consensus_peaks.bed', threshold=0.05):
+    def get_concensus_peaks(self, in_dir='peaks_qvalue', out_file='ATACseq_consensus_peaks.bed', threshold=0.05, using_summit=False, params={'chrom_col':0, 'start_col':1, 'summit_col':9, 'pval_col':7, 'half_width':250}):
         fs = sorted([x for x in os.listdir(in_dir) if x.endswith('.narrowPeak.gz')])
-        dfs = []
-        for f in fs:
-            df = pd.read_table(f'{in_dir}/{f}', header=None, sep='\t')
-            df = df.iloc[:, 0:3]
-            df.columns = ["Chromosome","Start","End"]
-            dfs.append(pyranges.PyRanges(df))
-        df_concated = pyranges.concat(dfs)
-        df_merged = df_concated.merge()
+        if not using_summit:
+            dfs = []
+            for f in fs:
+                df = pd.read_table(f'{in_dir}/{f}', header=None, sep='\t')
+                df = df.iloc[:, 0:3]
+                df.columns = ["Chromosome","Start","End"]
+                dfs.append(pyranges.PyRanges(df))
+            df_concated = pyranges.concat(dfs)
+            df_merged = df_concated.merge()
 
-        D = {}
-        for n in range(len(dfs)):
-            df_overlapped = df_merged.overlap(dfs[n])
-            keys = df_overlapped.df.iloc[:, 0:3].astype(str).agg('_'.join, axis=1)
-            for k in keys:
-                D.setdefault(k, 0)
-                D[k] += 1
+            D = {}
+            for n in range(len(dfs)):
+                df_overlapped = df_merged.overlap(dfs[n])
+                keys = df_overlapped.df.iloc[:, 0:3].astype(str).agg('_'.join, axis=1)
+                for k in keys:
+                    D.setdefault(k, 0)
+                    D[k] += 1
 
-        df = df_merged.df.copy()
-        df['peakID'] = df.iloc[:, 0:3].astype(str).agg('_'.join, axis=1)
-        df['count'] = df['peakID'].map(D).fillna(0).astype(int)
-        wh = df['count'] >= len(dfs) * threshold
-        df = df[wh].iloc[:, 0:3]
-        df.to_csv(out_file, header=False, index=False, sep='\t')
+            df = df_merged.df.copy()
+            df['peakID'] = df.iloc[:, 0:3].astype(str).agg('_'.join, axis=1)
+            df['count'] = df['peakID'].map(D).fillna(0).astype(int)
+            wh = df['count'] >= len(dfs) * threshold
+            df = df[wh].iloc[:, 0:3]
+            df.to_csv(out_file, header=False, index=False, sep='\t')
+        else:
+            chrom_col = params['chrom_col']
+            start_col = params['start_col']
+            summit_col = params['summit_col']
+            pval_col = params['pval_col']
+            half_width = params['half_width']
+
+            dfs = []
+            for f in fs:
+                df = pd.read_table(f'{in_dir}/{f}', header=None, sep='\t')
+                dfs.append(df)
+            df_concated = pd.concat(dfs)
+    
+            L = []
+            for chrom in sorted(df_concated[chrom_col].unique()):
+                print(chrom, flush=True)
+                df = df_concated[df_concated[chrom_col] == chrom]
+                # Step 1: expand peaks
+                df['start'] = df[start_col] + df[summit_col] - half_width
+                df['end'] = df[start_col] + df[summit_col] + half_width
+                # Step 2: sort by significance (smallest p-value first)
+                df = df.sort_values(pval_col)
+                selected = []
+                while len(df) > 0:
+                    # Step 3: pick most significant peak
+                    top = df.iloc[0, [chrom_col, -2, -1]]
+                    selected.append(top)
+                    # Step 4: remove overlapping peaks
+                    non_overlap_mask = (df['start'] > top['end']) | (df['end'] < top['start'])
+                    df = df[non_overlap_mask]
+                df_selected = pd.DataFrame(selected)
+                L.append(df_selected)
+            df_merged = pd.concat(L)
+            df_merged.to_csv(out_file, header=False, index=False, sep='\t')
 
     def get_peak_counts(self, in_file='ATACseq_consensus_peaks.bed', bam_dir='bams', out_file='featureCounts.sh', strand='+', n_threads=4, min_quality=30):
         saf = in_file.replace('.bed', '.saf')
