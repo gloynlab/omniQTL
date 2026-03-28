@@ -128,6 +128,9 @@ class QTL:
         print('PCA on bed file completed.')
 
     def get_QTLtools_script(self, pheno_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered.bed.gz', geno_file='genotype_imputed.vcf.gz', cov_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', out_suffix='PC25', qtl_type='caQTL', qtl_pass=['nominal', 'permute', 'conditional'], n_chunks=30, with_normal=True, with_std_err=True, with_cov=True, window_size=None, fdr_script=None, params={'nominal':1.0, 'permute':1000, 'conditional':0.05, 'seed':42, 'nominal_p_threshold':5e-8, 'nominal_p_col':12}):
+        if n_chunks < 22:
+            print('WARNING: QTLtools may not run properly with if chunks fewer than the number of chromosomes')
+
         pheno_samples = pd.read_table(pheno_file, header=0, sep='\t', nrows=1).columns[6:].values
         geno_samples = []
         with gzip.open(geno_file, 'rt') as f:
