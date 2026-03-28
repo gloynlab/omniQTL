@@ -20,7 +20,7 @@ conda activate omniQTL
 
 ## Usage
 
-```
+```python
 - genotyping data
 
 from omniQTL.genotyping import Genotyping
@@ -63,10 +63,18 @@ omni.get_mbv_script()
 
 omni.get_concensus_peaks(in_dir='peaks_qvalue', out_file='ATACseq_qvalue_consensus_peaks.bed')
 
-omni.get_summit_extended_fixed_width_peaks(in_dir='peaks_qvalue',out_file='ATACseq_qvalue_summitExtended_peaks.bed')
-omni.get_peak_counts(in_file='ATACseq_qvalue_consensus_peaks.bed', out_file='featureCounts_qvalue.sh')
-omni.merge_counts_tables(counts_tables='counts_tables_qvalue.txt', out_file='ATACseq_qvalue_peakCounts.txt')
-omni.get_closest_genes(in_file='ATACseq_qvalue_peakCounts.txt', gtf_file='Ensembl/Homo_sapiens.GRCh38.110.gtf')
+omni.get_summit_extended_fixed_width_peaks(in_dir='peaks_qvalue',
+out_file='ATACseq_qvalue_summitExtended_peaks.bed')
+
+omni.get_peak_counts(in_file='ATACseq_qvalue_consensus_peaks.bed',
+out_file='featureCounts_qvalue.sh')
+
+omni.merge_counts_tables(counts_tables='counts_tables_qvalue.txt',
+out_file='ATACseq_qvalue_peakCounts.txt')
+
+omni.get_closest_genes(in_file='ATACseq_qvalue_peakCounts.txt',
+gtf_file='Ensembl/Homo_sapiens.GRCh38.110.gtf')
+
 omni.counts_to_tpm(in_file='ATACseq_qvalue_peakCounts_closestGene.txt')
 
 omni.filter_phenotype_features(tpm_file='ATACseq_qvalue_peakCounts_closestGene_TPM.txt',
