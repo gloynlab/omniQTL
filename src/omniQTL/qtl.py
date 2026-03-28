@@ -147,7 +147,7 @@ class QTL:
             merge_script = f'merge_{qtl_type}_{qtl}_{out_suffix}.sh'
             if window_size is None:
                 if qtl_type in ['caQTL']:
-                    window_size = 1e4
+                    window_size = 1e3
                 elif qtl_type in ['eQTL', 'pQTL']:
                     window_size = 1e6
             window_size = int(window_size)
