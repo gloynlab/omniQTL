@@ -127,7 +127,7 @@ class QTL:
         subprocess.run(cmd, shell=True)
         print('PCA on bed file completed.')
 
-    def get_QTLtools_script(self, pheno_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered.bed.gz', geno_file='genotype_imputed.vcf.gz', cov_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', out_suffix='PC25', qtl_type='caQTL', qtl_pass=['nominal', 'permute', 'conditional'], n_chunks=30, with_normal=True, with_std_err=True, with_cov=True, window_size=None, fdr_script=None, params={'nominal':1.0, 'permute':1000, 'conditional':0.05, 'seed':42, 'nominal_p_threshold':5e-8, 'nominal_p_col':12}):
+    def get_QTLtools_script(self, pheno_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered.bed.gz', geno_file='genotype_imputed.vcf.gz', cov_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', out_suffix='PC25', qtl_type='caQTL', qtl_pass=['nominal', 'permute', 'conditional'], n_chunks=30, with_normal=True, with_std_err=True, with_cov=True, window_size=None, fdr_script=None, params={'nominal':1.0, 'permute':1000, 'conditional':0.05, 'seed':42}):
         if n_chunks < 22:
             print('WARNING: QTLtools may not run properly with if chunks fewer than the number of chromosomes')
 
@@ -167,7 +167,7 @@ class QTL:
                     elif qtl == 'conditional':
                         if n == 0:
                             print('Please make sure to run permutation analysis first to get the corresponding mapping file before the conditional analysis.')
-                        mapping_file = f'{qtl_type}_permute-{params["permute"]}_w{window_size_name_str}.thresholds.txt'
+                        mapping_file = f'{qtl_type}_permute-{params["permute"]}_w{window_size_name_str}_{out_suffix}.thresholds.txt'
                         cmd = f'QTLtools cis --chunk {n} {n_chunks} --vcf {geno_file} --bed {pheno_file} --mapping {mapping_file} --window {window_size}'
 
                     if with_cov and os.path.exists(cov_file):
@@ -198,23 +198,56 @@ class QTL:
                         else:
                             raise FileNotFoundError(f'FDR script is needed')
                     if os.path.exists(fdr_script):
-                        cmd = f'Rscript {fdr_script} {out_file_merged}.gz {params['conditional']} {out_file_merged}'
+                        cmd = f'Rscript {fdr_script} {out_file_merged}.gz {params['conditional']} {out_file_merged.split(".txt")[0]}'
                         if self.QTLtools_env is not None: 
                             cmd = f'conda run -n {self.QTLtools_env} ' + cmd
                     else:
                         raise FileNotFoundError(f'FDR script {fdr_script} not found')
                     out.write(cmd + '\n')
-                if qtl == 'nominal':
-                    out_file_merged_sig = out_file_merged.replace('.txt', '_sig.txt') 
-                    p_threshold = params['nominal_p_threshold']
-                    p_col = params['nominal_p_col']
-                    cmd = f"zcat {out_file_merged}.gz | awk 'NR==1{{print $0}} NR>1{{if(${p_col}<{p_threshold}) print $0}}' > {out_file_merged_sig}"
-                    out.write(cmd + '\n')
-                    cmd = f'gzip -f {out_file_merged_sig}'
-                    out.write(cmd + '\n')
-                elif qtl == 'permute':
-                    pass
 
+    def get_QTLtools_sig_table(self, in_file, qtl_pass=None, params={'p_col':'nom_pval', 'p_threshold':8e-5, 'padj_col':'adj_beta_pval'}):
+        if qtl_pass is None:
+            if in_file.find('nominal') != -1:
+                qtl_pass = 'nominal'
+            elif in_file.find('permute') != -1:
+                qtl_pass = 'permute'
+            elif in_file.find('conditional') != -1:
+                qtl_pass = 'conditional'
+            else:
+                raise ValueError(f'Cannot determine the qtl_pass from the input file name, please specify it in the function argument')
+        elif qtl_pass not in ['nominal', 'permute', 'conditional']:
+            raise ValueError(f'Invalid qtl_pass value, should be one of nominal, permute or conditional')
+
+        out_file = in_file.split('.txt')[0] + f'_sig.txt.gz'
+        if qtl_pass == 'nominal':
+            with gzip.open(in_file, 'rt') as fin, gzip.open(out_file, 'wt') as fout:
+                header = fin.readline().strip().split('\t')
+                fout.write('\t'.join(header) + '\n')
+                p_idx = header.index(params['p_col'])
+                for line in fin:
+                    fields = line.strip().split('\t')
+                    try:
+                        p_value = float(fields[p_idx])
+                        if p_value < params['p_threshold']:
+                            fout.write(line)
+                    except:
+                        pass
+        elif qtl_pass == 'permute':
+            in_file_sig = in_file.split('.txt')[0] + '.significant.txt'
+            out_file = in_file.split('.txt')[0] + f'_sig.txt.gz'
+            df = pd.read_table(in_file, header=0, sep='\t')
+            df_sig = pd.read_table(in_file_sig, header=None, sep=r'\s+')
+            wh = df.iloc[:, 0].isin(df_sig.iloc[:, 0])
+            df_sub = df.loc[wh, ]
+            df_sub.sort_values(by=params['padj_col'], inplace=True)
+            df_sub.to_csv(out_file, header=True, index=False, sep='\t')
+        elif qtl_pass == 'conditional':
+            out_file = in_file.split('.txt')[0] + f'_sig.txt.gz'
+            df = pd.read_table(in_file, header=0, sep='\t')
+            wh = (df['bwd_best_hit'] == 1) & (df['bwd_sig'] == 1)
+            df_sub = df.loc[wh]
+            df_sub.to_csv(out_file, header=True, index=False, sep='\t')
+    
     def add_extra_info(self, in_file, vcf_file):
         if not os.path.exists(vcf_file):
             raise FileNotFoundError(f'{vcf_file} not found')
