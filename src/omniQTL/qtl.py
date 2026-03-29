@@ -205,7 +205,7 @@ class QTL:
                         raise FileNotFoundError(f'FDR script {fdr_script} not found')
                     out.write(cmd + '\n')
 
-    def get_QTLtools_sig_table(self, in_file, qtl_pass=None, params={'p_col':'nom_pval', 'p_threshold':8e-5, 'padj_col':'adj_beta_pval'}):
+    def get_QTLtools_sig_table(self, in_file, thresholds_file=None, qtl_pass=None, params={'p_col':'nom_pval', 'padj_col':'adj_beta_pval'}):
         if qtl_pass is None:
             if in_file.find('nominal') != -1:
                 qtl_pass = 'nominal'
@@ -220,6 +220,12 @@ class QTL:
 
         out_file = in_file.split('.txt')[0] + f'_sig.txt.gz'
         if qtl_pass == 'nominal':
+            if not os.path.exists(thresholds_file):
+                raise FileNotFoundError(f'{thresholds_file} not found, please run permutation analysis first to get the corresponding thresholds file')
+            df_thresholds = pd.read_table(thresholds_file, header=None, sep=r'\s+')
+            df_thresholds.dropna(inplace=True)
+            D = dict(zip(df_thresholds.iloc[:, 0], df_thresholds.iloc[:, 1]))
+
             with gzip.open(in_file, 'rt') as fin, gzip.open(out_file, 'wt') as fout:
                 header = fin.readline().strip().split('\t')
                 fout.write('\t'.join(header) + '\n')
@@ -228,7 +234,8 @@ class QTL:
                     fields = line.strip().split('\t')
                     try:
                         p_value = float(fields[p_idx])
-                        if p_value < params['p_threshold']:
+                        p_threshold = D.get(fields[0], 0)
+                        if p_value < p_threshold:
                             fout.write(line)
                     except:
                         pass
@@ -243,14 +250,30 @@ class QTL:
             df_sub.to_csv(out_file, header=True, index=False, sep='\t')
         elif qtl_pass == 'conditional':
             out_file = in_file.split('.txt')[0] + f'_sig.txt.gz'
+            out_file_ranks = in_file.split('.txt')[0] + '_ranks.txt'
             df = pd.read_table(in_file, header=0, sep='\t')
-            wh = (df['bwd_best_hit'] == 1) & (df['bwd_sig'] == 1)
-            df_sub = df.loc[wh]
-            df_sub.to_csv(out_file, header=True, index=False, sep='\t')
+            wh = df['bwd_sig'] == 1
+            df_sig = df[wh]
+            wh = df_sig['bwd_best_hit'] == 1
+            df_best = df_sig.loc[wh]
+            df_best.to_csv(out_file, header=True, index=False, sep='\t')
+            L = []
+            for feature in sorted(df_sig.iloc[:, 0].unique()):
+                df_sub = df_sig[df_sig.iloc[:, 0] == feature]
+                n = df_sub['rank'].max() + 1
+                L.append([feature, n])
+            df_ranks = pd.DataFrame(L)
+            df_ranks.columns = ['feature', 'n_independent_signals']
+            df_ranks.sort_values(by='n_independent_signals', inplace=True)
+            df_ranks.to_csv(out_file_ranks, header=True, index=False, sep='\t')
     
-    def add_extra_info(self, in_file, vcf_file):
+    def add_extra_info(self, in_file, vcf_file, do_liftover=True, params={'liftover_from':'hg38', 'liftover_to':'hg19'}):
         if not os.path.exists(vcf_file):
             raise FileNotFoundError(f'{vcf_file} not found')
+
+        converter = None
+        if do_liftover:
+            converter = liftover.get_lifter(params['liftover_from'], params['liftover_to'])
 
         D = {}
         with gzip.open(vcf_file, 'rt') as f:
@@ -269,18 +292,34 @@ class QTL:
                     if item.startswith('MAF='):
                         maf = item.split('=')[-1]
                         break
-                if var_id not in D:
-                    D[var_id] = [alt, ref, maf]
+                ch_pos = '.'
+                try:
+                    if converter is not None:
+                        chrom_new, pos_new = converter[chrom][int(pos)][0]
+                        if chrom_new and pos_new:
+                            ch_pos = f'{chrom_new}_{pos_new}'
+                except:
+                    pass
+                D.setdefault(var_id, [])
+                D[var_id].append([alt, ref, maf, ch_pos])
 
-        out_file = in_file.split('.txt')[0] + '_extraInfo.txt.gz'
-        with gzip.open(in_file, 'rt') as f, gzip.open(out_file, 'wt') as out:
+        out_file = in_file.split('.txt')[0] + '_extraInfo'
+        out_file_txt = out_file + '.txt'
+        with gzip.open(in_file, 'rt') as f, open(out_file, 'w') as out:
             head = f.readline().strip()
-            out.write(head + '\t' + '\t'.join(['EA', 'NEA', 'MAF']) + '\n')
             for line in f:
                 fields = line.strip().split('\t')
                 var_id = fields[7]
+                n_var = 0
                 if var_id in D:
-                    info = D[var_id]
+                    n_var = len(D[var_id])
+                    info = D[var_id][0] + [n_var]
                 else:
-                    info = ['.', '.', '.']
-                out.write(line.strip() + '\t' + '\t'.join(info) + '\n')
+                    info = ['.', '.', '.', '.', n_var]
+                out.write(line.strip() + '\t' + '\t'.join([str(x) for x in info]) + '\n')
+
+        with open(out_file_txt, 'w') as out:
+            out.write(head + '\t' + '\t'.join(['effective_allele', 'non_effective_allele', 'MAF', f'chr_pos_{params["liftover_to"]}', 'n_var_in_vcf']) + '\n')
+        cmd = f'sort -k2,2V -k3,3n {out_file} >> {out_file_txt}; bgzip -f {out_file_txt}; tabix -s 2 -b 3 -e 3 -S 1 {out_file_txt}.gz; rm {out_file}'
+        subprocess.run(cmd, shell=True)
+

@@ -9,6 +9,7 @@ from importlib import resources
 import yaml
 import datetime
 import gzip
+import liftover
 BASE = resources.files(__package__.split(".")[0])
 
 def get_dbsnp_vcf(vcf_url='https://ftp.ncbi.nlm.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz', assembly_report_url='https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_assembly_report.txt', out_file='dbSNP157_GRCh38.vcf.gz'):

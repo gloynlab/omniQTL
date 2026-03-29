@@ -188,3 +188,8 @@ class Genotyping(ArrayQC):
         subprocess.run(cmd, shell=True)
         cmd = f'tabix -p vcf {output_vcf}'
         subprocess.run(cmd, shell=True)
+
+    def vcf_to_bfile(self, vcf_file):
+        bfile = vcf_file.split('.vcf')[0]
+        cmd = f'plink2 --vcf {vcf_file} --make-bed --out {bfile}'
+        subprocess.run(cmd, shell=True)
