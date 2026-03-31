@@ -81,7 +81,7 @@ class Summary:
         df = pd.DataFrame(L, columns=['qtl', 'numer_of_genes', 'genes'])
         df.to_csv(out_file, header=True, index=False, sep='\t')
 
-    def upset_plot(self, in_file='QTL_upset_plot_table.txt', cmap='deep'):
+    def plot_upset_qtl(self, in_file='QTL_upset_plot_table.txt', cmap='deep'):
         from upsetplot import from_contents
         from upsetplot import UpSet
         cmap = sns.color_palette(cmap)
@@ -101,6 +101,21 @@ class Summary:
         ax.style_subsets(present=('caQTL', 'pQTL'), facecolor=cmap[4])
         ax.style_subsets(present=('eQTL', 'pQTL'), facecolor=cmap[4])
         ax.style_subsets(present=('caQTL', 'eQTL', 'pQTL'), facecolor=cmap[5])
+        ax.plot()
+        plt.savefig(out_file)
+
+    def plot_upset_donors(self, in_files=[], out_file='donors_upset.pdf', color='C0'):
+        from upsetplot import from_contents
+        from upsetplot import UpSet
+
+        D = {}
+        for f in in_files:
+            df = pd.read_table(f, header=None, sep='\t')
+            typ = f.split('_')[0]
+            D[typ] = df.iloc[:, 0]
+
+        D2 = from_contents(D)
+        ax = UpSet(D2, subset_size="count", facecolor=color, show_counts=True)
         ax.plot()
         plt.savefig(out_file)
 
@@ -238,14 +253,93 @@ class Summary:
                 if min(D[k]) > p_threshold:
                     f.write(k + '\n')
 
+    def get_variant_annotation(self, in_file='pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_variants.txt', vep_file='pQTL_genotyping_sampleRenamed_rsID_variantFiltered_vep.vcf.gz', canonical_transcript_only=True):
+        D = {}
+        with gzip.open(vep_file, 'rt') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('#'):
+                    if line.find('ID=CSQ') != -1:
+                        csq_format = line.split('Format: ')[-1].split('"')[0].split('|')
+                        idx_canonical = csq_format.index('CANONICAL')
+                        idx_consequence = csq_format.index('Consequence')
+                else:
+                    fields = line.split('\t')
+                    var_id = fields[2]
+                    D.setdefault(var_id, [])
+                    fds = fields[7].split(';')
+                    for fd in fds:
+                        if fd.startswith('CSQ='):
+                            csq = fd.split('CSQ=')[-1].split(',')
+                            for item in csq:
+                                tm = item.split('|')
+                                if canonical_transcript_only:
+                                    if tm[idx_canonical] == 'YES':
+                                        D[var_id] += tm[idx_consequence].split('&')
+                                else:
+                                    D[var_id] += tm[idx_consequence].split('&')
+
+        out_file = in_file.replace('.txt', '_annotated.txt')
+        with open(in_file) as fin, open(out_file, 'w') as fout:
+            for line in fin:
+                items = line.strip().split('\t')
+                var_id = items[0]
+                annotation = 'intergenic_variant'
+                if var_id in D and D[var_id]:
+                    annotation = ','.join(sorted(set(D[var_id])))
+                fout.write('\t'.join(items + [annotation]) + '\n')
+
+    def count_variant_consequence(self, in_files=['pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_annotated.txt'], out_file='QTL_variants_consequence_count.txt'):
+        L = []
+        for f in in_files:
+            print(f'processing {f}...')
+            D = {}
+            N = 0
+            with open(f) as fin:
+                for line in fin:
+                    N += 1
+                    line = line.strip()
+                    fields = line.split('\t')
+                    fds = fields[-1].split(',')
+                    for item in fds:
+                        D.setdefault(item, 0)
+                        D[item] += 1
+            for k in sorted(D):
+                L.append([f, k, D[k], N - D[k]])
+        df = pd.DataFrame(L, columns=['file', 'annotation', 'in_count', 'out_count'])
+        df.to_csv(out_file, index=False, sep='\t')
+
     def split_Ensembl_regulatory_annotation(self, in_file='Ensembl_BioMart_RegulatoryAnnotation.txt.gz'):
-        df = pd.read_table(in_file, header=0, sep='\t')
+        df = pd.read_table(in_file, header=0, sep='\t', low_memory=False)
         for gi, g in df.groupby('Feature type'):
             out_file = in_file.replace('.txt.gz', f'_{gi}.bed')
             g_sub = g.loc[:, ['Chromosome/scaffold name', 'Start (bp)', 'End (bp)']]
             g_sub.columns = ['ch', 'start', 'end']
             g_sub['ch'] = [f'chr{x}' for x in g_sub['ch']]
             g_sub.to_csv(out_file, header=False, index=False, sep='\t')
+
+    def count_variant_regulatory(self, in_files=['pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_variants.txt'], bed_files=['Ensembl_BioMart_RegulatoryAnnotation_Enhancer.bed'], out_file='QTL_variants_regulatory_count.txt'):
+        L = []
+        for f1 in in_files:
+            for f2 in bed_files:
+                print(f'processing {f1} and {f2}...')
+                df1 = pd.read_table(f1, header=None, sep='\t')
+                df1.columns = ['rsID', 'Chromosome', 'Start']
+                df1['End'] = df1['Start']
+
+                df2 = pd.read_table(f2, header=None, sep='\t')
+                df2 = df2.iloc[:, 0:3]
+                df2.columns = ['Chromosome', 'Start', 'End']
+                df2['Start'] = df2['Start'] + 1
+
+                pr1 = pyranges.PyRanges(df1)
+                pr2 = pyranges.PyRanges(df2)
+
+                pi = pr1.intersect(pr2)
+                N = len(pi.rsID.unique())
+                L.append([f1, f2, N, df1.shape[0] - N])
+        df = pd.DataFrame(L, columns=['file', 'annotation', 'in_count', 'out_count'])
+        df.to_csv(out_file, index=False, sep='\t')
 
     def get_nominal_sig_associations(self, in_files=['caQTL_nominal-1.0_w1k_qvalue_extraInfo_sig.txt.gz',
                                    'eQTL_nominal-1.0_w1M_PC25_extraInfo_sig.txt.gz', 'pQTL_nominal-1.0_w1M_PC25_extraInfo_sig.txt.gz'],
@@ -293,7 +387,7 @@ class Summary:
             df_out.columns = df.columns
             df_out.to_csv(out_file, index=False, sep='\t')
 
-    def plot_heatmap_of_recurrent_associatoins(self, in_file='QTL_nominal_sig_associations_recurrent3.txt', cmap='coolwarm', figsize=(4, 8), fontsize=8, customize_cbar=True):
+    def plot_heatmap_of_recurrent_associatoins(self, in_file='QTL_nominal_sig_associations_recurrent3.txt', cmap='coolwarm', figsize=(4, 8), fontsize=8, customize_cbar=True, genes_highlight=['PTGFRN', 'STARD10', 'PEPD']):
         out_file = in_file.replace('.txt', '_heatmap.pdf')
         df = pd.read_table(in_file, header=0, sep='\t')
         df_pivot = df.pivot(index=['gene', 'var_id'], columns='qtl', values='beta')
@@ -310,6 +404,9 @@ class Summary:
         g.ax_col_dendrogram.set_visible(False)
         ax = g.ax_heatmap
         ax.set_yticklabels(ax.get_yticklabels(), fontsize=fontsize)
+        for tick in ax.get_yticklabels():
+            if tick.get_text() in genes_highlight:
+                tick.set_fontweight('bold')
 
         row_indices = g.dendrogram_row.reordered_ind
         for i, idx in enumerate(row_indices):

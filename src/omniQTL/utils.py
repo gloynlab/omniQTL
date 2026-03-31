@@ -100,7 +100,7 @@ def gtf_to_GenePosType(in_file):
 
 def annotate_vcf_with_vep(vcf_file, vep_env='vep115', vep_cache='vep_cache', species='homo_sapiens', assembly='GRCh38'):
     out_script = 'run_vep_' + vcf_file.split('.vcf')[0] + '.sh'
-    out_file = vcf_file.split('.vcf')[0] + '.vep'
+    out_file = vcf_file.split('.vcf')[0] + '_vep.vcf'
     with open(out_script, 'w') as fout:
         cmd = f'conda run -n {vep_env} vep --vcf -i {vcf_file} -o {out_file} --species {species} --assembly {assembly} --cache --dir_cache {vep_cache} --canonical --regulatory --show_ref_allele --force_overwrite'
         fout.write(cmd + '\n')
