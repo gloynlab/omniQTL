@@ -20,6 +20,7 @@ matplotlib.rcParams['savefig.dpi'] = 300
 import matplotlib.patches as mpatches
 import pylab as plt
 import seaborn as sns
+import scipy
 
 plt.rcParams.update({
     'figure.figsize': [6.4, 4.8],

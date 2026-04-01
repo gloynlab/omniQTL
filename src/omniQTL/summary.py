@@ -344,6 +344,7 @@ class Summary:
         df.to_csv(out_file, index=False, sep='\t')
 
     def split_Ensembl_regulatory_annotation(self, in_file='Ensembl_BioMart_RegulatoryAnnotation.txt.gz'):
+        # download the regulatory annotation from Ensembl BioMart manually, then split the file into different feature types for downstream analysis
         df = pd.read_table(in_file, header=0, sep='\t', low_memory=False)
         for gi, g in df.groupby('Feature type'):
             out_file = in_file.replace('.txt.gz', f'_{gi}.bed')
@@ -374,6 +375,55 @@ class Summary:
                 L.append([f1, f2, N, df1.shape[0] - N])
         df = pd.DataFrame(L, columns=['file', 'annotation', 'in_count', 'out_count'])
         df.to_csv(out_file, index=False, sep='\t')
+
+    def test_enrichment_using_fisher_exact(self, in_file='QTL_variants_regulatory_count.txt'):
+        out_file = in_file.replace('.txt', '_enrichment.txt')
+        L = []
+        df = pd.read_table(in_file, header=0, sep='\t')
+        df['qtl_type'] = [x.split('_')[0] for x in df['file']]
+        df['order'] = [1 if x.find('non_sig') != -1 else 0 for x in df['file']]
+        df.sort_values('order', inplace=True)
+        for gi, g in df.groupby(['qtl_type', 'annotation']):
+            if g.shape[0] == 2:
+                in_count_sig = g['in_count'].iloc[0]
+                out_count_sig = g['out_count'].iloc[0]
+                in_count_non_sig = g['in_count'].iloc[1]
+                out_count_non_sig = g['out_count'].iloc[1]
+                table = [[in_count_sig, out_count_sig], [in_count_non_sig, out_count_non_sig]]
+                oddsratio, pvalue = scipy.stats.fisher_exact(table)
+                L.append([gi[0], gi[1], oddsratio, pvalue])
+            else:
+                print(f'Annotation {gi} needs to be checked')
+        df_out = pd.DataFrame(L, columns=['qtl', 'annotation', 'odds_ratio', 'p_value'])
+        df_out.to_csv(out_file, index=False, sep='\t')
+
+    def bar_plot_enrichment(self, in_file='QTL_variants_regulatory_count_enrichment.txt', subset_renaming_file='subset_renaming.txt', xlim=[0, 10], cmap='Dark2', title='Enrichment of QTL significant variants'):
+        D = {}
+        if subset_renaming_file and os.path.exists(subset_renaming_file):
+            df_subset = pd.read_table(subset_renaming_file, header=None, sep='\t')
+            D = dict(zip(df_subset.iloc[:, 0], df_subset.iloc[:, 1]))
+
+        out_file = in_file.replace('.txt', '_barplot.pdf')
+        df = pd.read_table(in_file, header=0, sep='\t')
+        if D:
+            wh = df['annotation'].isin(D)
+            df = df[wh].copy()
+            df.sort_values('annotation', key=lambda x: [list(D.keys()).index(i) for i in x], inplace=True)
+            df['annotation'] = df['annotation'].map(D)
+
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        sns.barplot(y='annotation', x='odds_ratio', hue='qtl', data=df, ax=ax, palette=cmap)
+        ylim = ax.get_ylim()
+        ax.plot([1, 1], ylim, '--', color='orange', lw=2)
+        if xlim:
+            ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_title(title)
+        ax.set_ylabel('')
+        ax.legend(title=None, loc='lower right')
+        plt.tight_layout()
+        plt.savefig(out_file)
 
     def get_nominal_sig_associations(self, in_files=['caQTL_nominal-1.0_w1k_qvalue_extraInfo_sig.txt.gz',
                                    'eQTL_nominal-1.0_w1M_PC25_extraInfo_sig.txt.gz', 'pQTL_nominal-1.0_w1M_PC25_extraInfo_sig.txt.gz'],
