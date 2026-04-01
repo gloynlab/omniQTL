@@ -31,14 +31,14 @@ class Summary:
         plt.tight_layout()
         plt.savefig(out_file)
 
-    def bar_plot_significant_loci(self, in_file, axes=[0.3, 0.4, 0.6, 0.5], cmap='Dark2', show_numbers=True):
+    def bar_plot_significant_loci(self, in_file, axes=[0.3, 0.4, 0.6, 0.5], cmap='Dark2', show_numbers=True, figsize=(4, 4)):
         out_file = in_file.split('.txt')[0] + '.pdf'
         cmap = sns.color_palette(cmap)
 
         df = pd.read_table(in_file, header=0, sep='\t')
         df['StudySampleSize'] = [f"{df['Study'].iloc[n]}\n(N={df['SampleSize'].iloc[n]})" for n in range(df.shape[0])]
     
-        fig = plt.figure()
+        fig = plt.figure(figsize=figsize)
         ax = fig.add_axes(axes)
         sns.barplot(y='Number of significant loci', x='StudySampleSize', hue='StudySampleSize', data=df, palette=[cmap[0], cmap[-1], cmap[1], cmap[-1], cmap[2]], legend=False)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
@@ -50,8 +50,8 @@ class Summary:
         ylim = ax.get_ylim()
         ax.set_ylim(ylim[0], ylim[1] * 1.1)
 
-        y1 = -0.4
-        y2 = -0.5
+        y1 = -0.5
+        y2 = -0.55
         ax.plot([0, 0, 1, 1], [y1, y2, y2, y1], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
         ax.plot([2, 2, 3, 3], [y1, y2, y2, y1], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
         ax.plot([4, 4], [y1, y2], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
