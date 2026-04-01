@@ -20,7 +20,6 @@ class Summary:
 
     def qq_plot(self, in_file, title='QQ plot', markerscale=4, scatter_size=4, color='C1', figsize=(4, 4)):
         out_file = in_file.replace('.txt', '.pdf')
-        qtl_type = in_file.split('_')[0]
         df = pd.read_table(in_file, header=0, sep='\t')
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot()
@@ -28,7 +27,7 @@ class Summary:
         ax.plot([0, df['expected'].max()], [0, df['expected'].max()], linestyle="--", color='C0')
         ax.set_xlabel("Expected -log10(p)")
         ax.set_ylabel("Observed -log10(p)")
-        ax.set_title(title + ' of ' + qtl_type)
+        ax.set_title(title)
         plt.tight_layout()
         plt.savefig(out_file)
 
@@ -175,6 +174,36 @@ class Summary:
         plt.tight_layout()
         plt.savefig(out_file)
 
+    def get_length_distribution_merged_peaks(self, in_files=[], out_file='caQTL_length_distribution_merged_peaks.txt', params={'consensus':'consensus peaks', 'summitExtended':'summit extended peaks'}):
+        L = []
+        for f in in_files:
+            peak_type = f.split('_')[-2].split('.bed')[0]
+            peak_type = params.get(peak_type, peak_type)
+            with open(f) as fin:
+                for line in fin:
+                    items = line.strip().split('\t')
+                    length = int(items[2]) - int(items[1])
+                    L.append([peak_type, length])
+        df = pd.DataFrame(L, columns=['peak_type', 'length'])
+        df.to_csv(out_file, index=False, sep='\t')
+
+    def plot_length_distribution_merged_peaks(self, in_file='caQTL_length_distribution_merged_peaks.txt', cmap='Dark2', xlabel='Length of merged peaks (bp)', figsize=(4, 4), peak_types=['consensus peaks', 'summit extended peaks']):
+        cmap = sns.color_palette(cmap)
+        out_file = in_file.split('.txt')[0] + '_hist.pdf'
+        df = pd.read_table(in_file, header=0, sep='\t')
+        df1 = df[df['peak_type'] == peak_types[0]]
+        df2 = df[df['peak_type'] == peak_types[1]]
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.kdeplot(x='length', ax=ax, data=df1, color=cmap[0], label=peak_types[0])
+        x = df2['length'].iloc[0]
+        y = ax.get_ylim()[1] * 0.9
+        ax.plot([x, x], [0, y], color=cmap[1], label=peak_types[1], linestyle='--', lw=2)
+        ax.set_xlabel(xlabel)
+        ax.legend(title=None)
+        plt.tight_layout()
+        plt.savefig(out_file)
+
     def get_number_independent_signals(self, in_files=[], out_file='QTL_number_of_independent_signals.txt'):
         L = []
         for f in in_files:
@@ -289,7 +318,7 @@ class Summary:
                     annotation = ','.join(sorted(set(D[var_id])))
                 fout.write('\t'.join(items + [annotation]) + '\n')
 
-    def count_variant_consequence(self, in_files=['pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_annotated.txt'], out_file='QTL_variants_consequence_count.txt', extra_class=['splice', '', 'inframe', 'frameshift', 'stop', 'start']):
+    def count_variant_consequence(self, in_files=['pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_annotated.txt'], out_file='QTL_variants_consequence_count.txt', extra_class=['splice', 'UTR', 'inframe', 'frameshift', 'stop', 'start']):
         L = []
         for f in in_files:
             print(f'processing {f}...')
