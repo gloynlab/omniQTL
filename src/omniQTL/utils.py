@@ -9,6 +9,7 @@ from importlib import resources
 import yaml
 import datetime
 import gzip
+import tabix
 import liftover
 import matplotlib
 matplotlib.use('agg')

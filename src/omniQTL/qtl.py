@@ -127,6 +127,35 @@ class QTL:
         subprocess.run(cmd, shell=True)
         print('PCA on bed file completed.')
 
+    def add_extra_covariates(self, in_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', extra_cov_file='sample_info.txt'):
+        out_file = in_file.replace('.txt', '_extraCov.txt')
+        df_cov = pd.read_table(extra_cov_file, header=0, sep='\t')
+        D = {}
+        for n in range(df_cov.shape[0]):
+            for m in range(1, df_cov.shape[1]):
+                cov_name = df_cov.columns[m]
+                sample = df_cov.iloc[n, 0]
+                value = df_cov.iloc[n, m]
+                D.setdefault(cov_name, {})
+                D[cov_name][sample] = value
+
+        df = pd.read_table(in_file, header=0, sep=r'\s+')
+        L = []
+        for cov_name in D:
+            V = [cov_name]
+            for sample in df.columns[1:]:
+                if sample in D[cov_name]:
+                    value = D[cov_name][sample]
+                else:
+                    value = 0
+                    print(f'WARNING: sample {sample} not found in covariate {cov_name}, assigning value 0')
+                V.append(value)
+            L.append(V)
+        df_extra = pd.DataFrame(L)
+        df_extra.columns = df.columns
+        df = pd.concat([df, df_extra])
+        df.to_csv(out_file, header=True, index=False, sep=' ')
+
     def get_QTLtools_script(self, pheno_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered.bed.gz', geno_file='genotype_imputed.vcf.gz', cov_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', out_suffix='PC25', qtl_type='caQTL', qtl_pass=['nominal', 'permute', 'conditional'], n_chunks=30, with_normal=True, with_std_err=True, with_cov=True, window_size=None, fdr_script=None, params={'nominal':1.0, 'permute':1000, 'conditional':0.05, 'seed':42}):
         if n_chunks < 22:
             print('WARNING: QTLtools may not run properly with if chunks fewer than the number of chromosomes')
