@@ -127,6 +127,28 @@ class QTL:
         subprocess.run(cmd, shell=True)
         print('PCA on bed file completed.')
 
+    def get_PCA_scree_plot(self, in_file='ATACseq_qvalue_peakCounts_closestGene_TPM_peakFiltered.pca_stats', title='Scree plot', col='prop_var', color='steelblue', figsize=(4, 4), n_pcs_max=80):
+        df = pd.read_table(in_file, header=None, sep=r'\s+')
+        df = df[df.iloc[:, 0] == col]
+        df_var = pd.DataFrame()
+        df_var['PC'] = ['PC' + str(i) for i in range(1, df.shape[1])]
+        df_var['Variance Explained'] = list(df.iloc[0, 1:].astype(float).values)
+
+        out_file = in_file.split('.pca_stats')[0] + f'_PCA_screePlot.pdf'
+        out_file_txt = in_file.split('.pca_stats')[0] + f'_PCA_screePlot.txt'
+        df_var.to_csv(out_file_txt, header=True, index=False, sep='\t')
+
+        df_var = df_var.iloc[:n_pcs_max, ]
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.barplot(data=df_var, x='PC', y='Variance Explained', ax=ax, color=color)
+        ax.set_xticks([])
+        ax.set_xlabel('PCA Components')
+        ax.set_ylabel('Variance Explained')
+        ax.set_title(title)
+        plt.tight_layout()
+        plt.savefig(out_file)
+
     def add_extra_covariates(self, in_file='ATACseq_peakCounts_closestGene_TPM_subsetRenamed_peakFiltered_PC25.txt', extra_cov_file='sample_info.txt'):
         out_file = in_file.replace('.txt', '_extraCov.txt')
         df_cov = pd.read_table(extra_cov_file, header=0, sep='\t')
