@@ -184,6 +184,182 @@ class LocusZoomPlot(GeneTxPlot):
         df.to_csv(f'{gene}_data.txt', sep='\t', index=None)
         return df
 
-if __name__ == '__main__':
-    pass
+class GenoPhenoBarPlot(GeneTxPlot):
+    def __init__(self):
+        pass
 
+    def get_pheno_df(self, bed_file, window, gene='PTGFRN', extra_filter=None, transform=None):
+        header = pd.read_table(bed_file, header=0, nrows=0, sep='\t')
+        tb = tabix.open(bed_file)
+        chrom = window[0]
+        x_min = window[1]
+        x_max = window[2]
+        res = tb.query(chrom, x_min, x_max)
+        df = pd.DataFrame(res)
+        df.columns = header.columns
+        if gene:
+            wh = [True if gene in x.split('_')[-1].split(',') else False for x in df['pid']]
+            df = df[wh]
+
+        if gene and len(df['pid'].unique()) > 1:
+            if extra_filter is None:
+                print(df['pid'].unique())
+                print(f'Multiple peaks of the same gene found. Using the first one {df["pid"].iloc[0]}')
+                wh = df['pid'] == df['pid'].iloc[0]
+                df = df[wh]
+            else:
+                print(df['pid'].unique())
+                print(f'Multiple peaks of the same gene found. Using {extra_filter} for filtering')
+                wh = df['pid'].str.contains(extra_filter)
+                df = df[wh]
+
+        if df.shape[0] == 1:
+            dft = pd.DataFrame()
+            dft['sample'] = df.columns[6:]
+            dft['feature'] = df['pid'].iloc[0]
+            L = []
+            for n in range(6, df.shape[1]):
+                value = df.iloc[0, n]
+                try:
+                    value = float(value)
+                except:
+                    value = np.nan
+                L.append(value)
+            dft['value'] = L
+            if transform == 'power2':
+                dft['value'] = np.power(2, dft['value'])
+            return dft
+        else:
+            raise ValueError(f'Check if the var_id {var_id} is correct.')
+        return dft
+
+    def get_geno_df(self, vcf_file, window, var_id='rs1127215', extra_filter=None):
+        tb = tabix.open(vcf_file)
+        with gzip.open(vcf_file, 'rt') as f:
+            for line in f:
+                if line.startswith('#CHROM'):
+                    header = line.strip().split('\t')
+                    break
+        chrom = window[0]
+        x_min = window[1]
+        x_max = window[2]
+        res = tb.query(chrom, x_min, x_max)
+        df = pd.DataFrame(res)
+        df.columns = header
+        if var_id:
+            wh = df['ID'] == var_id
+            df = df[wh]
+
+        if var_id and len(df['ALT'].unique()) > 1:
+            if extra_filter is not None:
+                df = df[df['ALT'] == extra_filter]
+            else:
+                print('Multiple variants found for the given var_id. Using the first one for now')
+                print(df[['ID', 'ALT']].unique())
+                df = df[df['ALT'] == df['ALT'].iloc[0]]
+
+        if df.shape[0] == 1:
+            dft = pd.DataFrame()
+            dft['sample'] = df.columns[9:]
+            dft['REF'] = df['REF'].iloc[0]
+            dft['ALT'] = df['ALT'].iloc[0]
+            L = []
+            for n in range(9, df.shape[1]):
+                gt = df.iloc[0, n].split(':')[0]
+                if gt in ['0/0', '0|0']:
+                    g = 0
+                elif gt in ['0/1', '1/0', '0|1', '1|0']:
+                    g = 1
+                elif gt in ['1/1', '1|1']:
+                    g = 2
+                else:
+                    g = np.nan
+                L.append(g)
+            dft['genotype'] = L
+            return dft
+        else:
+            raise ValueError(f'Check if the var_id {var_id} is correct.')
+
+    def bar_plot(self, df_geno, df_pheno, out_file='geno_pheno_barplot.pdf', figsize=(4, 4), title='eQTL', label='eQTL', color='C0', capsize=0.05):
+        df = pd.merge(df_geno, df_pheno, on='sample')
+        df = df.dropna(subset=['genotype', 'value'])
+
+        LabelName = {'eQTL':'Gene expression (TPM)', 'caQTL':'Peak counts (TPM)', 'pQTL':'Protein abundance (intensity)'}
+        ValueCounts = pd.DataFrame(df['genotype'].value_counts()).reset_index()
+        ValueCounts = dict(zip(ValueCounts['genotype'], ValueCounts['count']))
+        ref, alt = df_geno['REF'].iloc[0], df_geno['ALT'].iloc[0]
+        GT = {0:f'{ref}/{ref}', 1:f'{ref}/{alt}', 2:f'{alt}/{alt}'}
+
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.barplot(x='genotype', y='value', data=df, capsize=capsize, ax=ax, color=color)
+
+        xticks = [0, 1, 2]
+        ax.set_xticks(xticks)
+        xtick_labels = [f'{GT.get(x, './.')}\nN={ValueCounts.get(x, 0)}' for x in xticks]
+        ax.set_xticklabels(xtick_labels)
+        ax.set_xlabel('')
+        ylabel = LabelName.get(label.split('_')[0], 'Phenotype value')
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+
+        plt.tight_layout()
+        plt.savefig(out_file)
+
+if __name__ == '__main__':
+	def plot_locus(gene='PTGFRN', var_id='rs1127215'):
+		fig = plt.figure()
+		ax1 = fig.add_axes([0.15, 0.05, 0.75, 0.2])
+		ax2 = fig.add_axes([0.15, 0.27, 0.75, 0.2])
+		ax3 = fig.add_axes([0.15, 0.49, 0.75, 0.2])
+		ax4 = fig.add_axes([0.15, 0.71, 0.75, 0.2])
+
+		lzp = LocusZoomPlot()
+
+		df = lzp.read_bed12(bed12='Homo_sapiens.GRCh38.115.bed12')
+		dfg, window = lzp.subset_gene(df=df, gene=gene)
+		lzp.plot_gene_tx(dfg, window=window, ax=ax1, show_genes=[gene])
+
+		dfs = lzp.bgzip_to_df(bgzip_file='caQTL_nominal-1.0_w1k_qvalue_extraInfo.txt.gz', window=window, gene=gene, var_id=var_id, bfile='caQTL_genotyping_sampleRenamed_rsID_variantFiltered')
+		lzp.scatter_plot(dfs, window=window, ax=ax4, ylabel='caQTL', show_legend=True)
+
+		dfs = lzp.bgzip_to_df(bgzip_file='eQTL_nominal-1.0_w1M_PC25_extraInfo.txt.gz', window=window, gene=gene, var_id=var_id, bfile='eQTL_genotyping_sampleRenamed_rsID_variantFiltered')
+		lzp.scatter_plot(dfs, window=window, ax=ax3, ylabel='-log10(p)\neQTL')
+
+		dfs = lzp.bgzip_to_df(bgzip_file='pQTL_nominal-1.0_w1M_PC25_extraInfo.txt.gz', window=window, gene=gene, var_id=var_id, bfile='pQTL_genotyping_sampleRenamed_rsID_variantFiltered')
+		lzp.scatter_plot(dfs, window=window, ax=ax2, ylabel='pQTL')
+
+		ax4.set_title(f'{gene} {var_id}')
+
+		plt.savefig(f'{gene}.pdf')
+
+	def geno_pheo_bar_plot(geno_file, pheno_file, gene, var_id, label, transform=None, color='C0', extra_filter=None, alt_filter=None):
+		dfg, window = gpb.subset_gene(df, gene)
+
+		df_pheno = gpb.get_pheno_df(bed_file=pheno_file, window=window, gene=gene, transform=transform, extra_filter=extra_filter)
+		df_geno = gpb.get_geno_df(vcf_file=geno_file, window=window, var_id=var_id, extra_filter=alt_filter)
+
+		gpb.bar_plot(df_geno=df_geno, df_pheno=df_pheno, out_file=f'{gene}_{var_id}_{label}_barplot.pdf', title=f'{gene} {var_id}', label=label, color=color)
+
+
+		## locus zoom plot
+		plot_locus(gene='PTGFRN', var_id='rs1127215')
+		plot_locus(gene='PEPD', var_id='rs79910652')
+		plot_locus(gene='STARD10', var_id='rs140130268')
+
+		## geno pheno bar plot	
+    	gpb = GenoPhenoBarPlot()
+    	bed12 = 'Homo_sapiens.GRCh38.115.bed12'
+    	df = gpb.read_bed12(bed12)
+    	cmap = sns.color_palette('Dark2')
+    
+    	eqtl_vcf = 'eQTL_genotyping_sampleRenamed_rsID_variantFiltered.vcf.gz'
+    	eqtl_bed = 'eQTL_geneCounts_geneName_TPM_geneFiltered.bed.gz'
+    	caqtl_vcf = 'caQTL_genotyping_sampleRenamed_rsID_variantFiltered.vcf.gz'
+    	caqtl_bed = 'ATACseq_qvalue_peakCounts_closestGene_TPM_peakFiltered.bed.gz'
+    	pqtl_vcf = 'pQTL_genotyping_sampleRenamed_rsID_variantFiltered.vcf.gz'
+    	pqtl_bed = 'Proteomics_subsetRenamed_proteinFiltered.bed.gz'
+    
+    	geno_pheo_bar_plot(geno_file=eqtl_vcf, pheno_file=eqtl_bed, gene='PTGFRN', var_id='rs1127215', label='eQTL', color=cmap[0])
+    	geno_pheo_bar_plot(geno_file=caqtl_vcf, pheno_file=caqtl_bed, gene='PTGFRN', var_id='rs1127215', label='caQTL_peak_chr1_116988204_116989436', color=cmap[1], extra_filter='chr1_116988204_116989436_PTGFRN')
+    	geno_pheo_bar_plot(geno_file=pqtl_vcf, pheno_file=pqtl_bed, gene='PTGFRN', var_id='rs1127215', label='pQTL', transform='power2', color=cmap[2])
