@@ -109,7 +109,7 @@ class Coloc:
                 else:
                     chrom = 'chr' + chrom
                 res = tb.query(chrom, start, end)
-            if res is None or len(res) == 0:
+            if res is None or pd.DataFrame(res).shape[0] == 0:
                 print(f'No variants found in sumstats2 for feature {feature}. Skipping.')
                 continue
 
