@@ -117,7 +117,7 @@ class Coloc:
             df2_sub['var_key'] = df2_sub[params2['var_key']].apply(lambda x: '_'.join(x.astype(str)), axis=1)
             df2_sub.columns = [x + sumstats_suffixes[1] for x in df2_sub.columns]
             if sumstats2_type == 'gwas':
-                df2_subs = ['none', df2_sub]
+                df2_subs = [['none', df2_sub]]
             elif sumstats2_type == 'qtl':
                 df2_subs = []
                 for gi, g in df2_sub.groupby(params2['feature_id'] + sumstats_suffixes[1]):

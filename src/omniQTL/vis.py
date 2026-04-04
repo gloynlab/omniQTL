@@ -306,6 +306,14 @@ class GenoPhenoBarPlot(GeneTxPlot):
 	    plt.tight_layout()
 	    plt.savefig(out_file)
 
+class GenomeTrackPlot():
+    def __init__(self, config='config.yaml'):
+        if os.path.exists(config):
+            with open(config) as f:
+                self.config = yaml.safe_load(f)
+        else:
+            raise FileNotFoundError(f'{config} not found.')
+
 if __name__ == '__main__':
 	def plot_locus(gene='PTGFRN', var_id='rs1127215'):
 		fig = plt.figure()
