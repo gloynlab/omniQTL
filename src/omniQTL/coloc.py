@@ -135,7 +135,7 @@ class Coloc:
                     df1x['type'] = sumstats1_study_type
                     df1x['N'] = sumstats1_sample_size
                     if sumstats1_study_type == 'quant':
-                        df1x['MAF'] = df_merged[params1['maf_col'] + sumstats_suffixes[0]]
+                        df1x['MAF'] = df_merged[params1['maf_col'] + sumstats_suffixes[0]].astype(float)
                     df1x['phe_id'] = feature
 
                     df2x['snp'] = df_merged['var_key' + sumstats_suffixes[1]]
@@ -145,7 +145,7 @@ class Coloc:
                     df2x['type'] = sumstats2_study_type
                     df2x['N'] = sumstats2_sample_size
                     if sumstats2_study_type == 'quant':
-                        df2x['MAF'] = df_merged[params2['maf_col'] + sumstats_suffixes[1]]
+                        df2x['MAF'] = df_merged[params2['maf_col'] + sumstats_suffixes[1]].astype(float)
                     df2x['phe_id'] = feature2
 
                     output_file1 = os.path.join(out_dir, f'{feature}-{feature2}{sumstats_suffixes[0]}.txt')
