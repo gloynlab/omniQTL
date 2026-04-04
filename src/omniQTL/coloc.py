@@ -65,7 +65,7 @@ class Coloc:
         print(cmd)
         subprocess.run(cmd, shell=True)
 
-    def prepare_coloc_input(self, sumstats1='sumstats_from_QTLtools.txt', sumstats2='sumstats_gwas_harmonised.txt', sumstats1_type='qtl', sumstats2_type='gwas', sumstats1_sample_size=100, sumstats2_sample_size=1000000, sumstats1_study_type='quant', sumstats2_study_type='cc', sumstats1_sig_file='sumstats_from_QTLtools_permute_sig.txt', out_dir=None, bfile_for_ld=None, external_ld=None, sumstats_suffixes=['_ss1', '_ss2'], params1={'var_key':['var_id'], 'feature_id':'phe_id', 'pos_col':'var_from', 'beta_col':'slope', 'se_col':'slope_se', 'maf_col':'MAF'}, params2={'var_key':['rsid'], 'pos_col':'base_pair_location', 'beta_col':'beta', 'se_col':'standard_error', 'maf_col':'MAF'}):
+    def prepare_coloc_input(self, sumstats1='sumstats_from_QTLtools.txt', sumstats2='sumstats_gwas_harmonised.txt', sumstats1_type='qtl', sumstats2_type='gwas', sumstats1_sample_size=100, sumstats2_sample_size=1000000, sumstats1_study_type='quant', sumstats2_study_type='cc', sumstats1_sig_file='sumstats_from_QTLtools_permute_sig.txt', pos_flank=1e6, out_dir=None, bfile_for_ld=None, external_ld=None, sumstats_suffixes=['_ss1', '_ss2'], params1={'var_key':['var_id'], 'feature_id':'phe_id', 'chrom_col':'var_chr', 'pos_col':'var_from', 'beta_col':'slope', 'se_col':'slope_se', 'maf_col':'MAF'}, params2={'var_key':['rsid'], 'chrom_col':'chromosome', 'pos_col':'base_pair_location', 'beta_col':'beta', 'se_col':'standard_error', 'maf_col':'MAF'}):
         if out_dir is None:
             out_dir = sumstats1.split('.txt')[0].split('.tsv')[0] + '_' + sumstats2.split('.txt')[0].split('.tsv')[0] + '_coloc'
         os.makedirs(out_dir, exist_ok=True)
@@ -85,57 +85,89 @@ class Coloc:
             df1 = df1[wh].copy()
 
         df1['var_key'] = df1[params1['var_key']].apply(lambda x: '_'.join(x.astype(str)), axis=1)
-
-        df2 = pd.read_table(sumstats2, sep='\t', header=0)
-        df2['var_key'] = df2[params2['var_key']].apply(lambda x: '_'.join(x.astype(str)), axis=1)
         df1.columns = [x + sumstats_suffixes[0] for x in df1.columns]
-        df2.columns = [x + sumstats_suffixes[1] for x in df2.columns]
 
-        features = sorted(df1[params1['feature_id'] + sumstats_suffixes[0]].unique())
-        for feature in features:
-            df1_sub = df1[df1[params1['feature_id'] + sumstats_suffixes[0]] == feature]
+        tb = tabix.open(sumstats2)
+        df2_header = pd.read_table(sumstats2, sep='\t', header=0, nrows=0).columns
+
+        for feature, df1_sub in df1.groupby(params1['feature_id'] + sumstats_suffixes[0]):
+            try:
+                chrom = df1_sub[params1['chrom_col'] + sumstats_suffixes[0]].iloc[0]
+                start = int(df1_sub[params1['pos_col'] + sumstats_suffixes[0]].min() - pos_flank)
+                end = int(df1_sub[params1['pos_col'] + sumstats_suffixes[0]].max() + pos_flank)
+                print(['processing:', feature, chrom, start, end], flush=True)
+            except:
+                print(f'Error processing feature {feature}. Skipping.')
+                continue
+
+            res = None
+            try:
+                res = tb.query(chrom, start, end)
+            except:
+                if chrom.startswith('chr'):
+                    chrom = chrom[3:]
+                else:
+                    chrom = 'chr' + chrom
+                res = tb.query(chrom, start, end)
+            if res is None or len(res) == 0:
+                print(f'No variants found in sumstats2 for feature {feature}. Skipping.')
+                continue
+
+            df2_sub = pd.DataFrame(res, columns=df2_header)
+            df2_sub['var_key'] = df2_sub[params2['var_key']].apply(lambda x: '_'.join(x.astype(str)), axis=1)
+            df2_sub.columns = [x + sumstats_suffixes[1] for x in df2_sub.columns]
             if sumstats2_type == 'gwas':
-                df2_sub = df2
+                df2_subs = ['none', df2_sub]
             elif sumstats2_type == 'qtl':
-                df2_sub = df2[df2[params2['feature_id'] + sumstats_suffixes[1]] == feature]
-            df_merged = pd.merge(df1_sub, df2_sub, left_on='var_key' + sumstats_suffixes[0], right_on='var_key' + sumstats_suffixes[1]).sort_values(by=params1['pos_col'] + sumstats_suffixes[0])
-            if df_merged.shape[0]:
-                print(df_merged)
-                df1x = pd.DataFrame() 
-                df2x = pd.DataFrame() 
-                df1x['snp'] = df_merged['var_key' + sumstats_suffixes[0]]
-                df1x['pos'] = df_merged[params1['pos_col'] + sumstats_suffixes[0]]
-                df1x['beta'] = df_merged[params1['beta_col'] + sumstats_suffixes[0]]
-                df1x['varbeta'] = df_merged[params1['se_col'] + sumstats_suffixes[0]] ** 2
-                df1x['type'] = sumstats1_study_type
-                df1x['N'] = sumstats1_sample_size
-                if sumstats1_study_type == 'quant':
-                    df1x['MAF'] = df_merged[params1['maf_col'] + sumstats_suffixes[0]]
+                df2_subs = []
+                for gi, g in df2_sub.groupby(params2['feature_id'] + sumstats_suffixes[1]):
+                    df2_subs.append([gi, g])
 
-                df2x['snp'] = df_merged['var_key' + sumstats_suffixes[1]]
-                df2x['pos'] = df_merged[params2['pos_col'] + sumstats_suffixes[1]]
-                df2x['beta'] = df_merged[params2['beta_col'] + sumstats_suffixes[1]]
-                df2x['varbeta'] = df_merged[params2['se_col'] + sumstats_suffixes[1]] ** 2
-                df2x['type'] = sumstats2_study_type
-                df2x['N'] = sumstats2_sample_size
-                if sumstats2_study_type == 'quant':
-                    df2x['MAF'] = df_merged[params2['maf_col'] + sumstats_suffixes[1]]
+            for feature2, df2_sub in df2_subs:
+                df_merged = pd.merge(df1_sub, df2_sub, left_on='var_key' + sumstats_suffixes[0], right_on='var_key' + sumstats_suffixes[1]).sort_values(by=params1['pos_col'] + sumstats_suffixes[0])
+                if df_merged.shape[0]:
+                    df1x = pd.DataFrame() 
+                    df2x = pd.DataFrame() 
+                    df1x['snp'] = df_merged['var_key' + sumstats_suffixes[0]]
+                    df1x['pos'] = df_merged[params1['pos_col'] + sumstats_suffixes[0]].astype(int)
+                    df1x['beta'] = df_merged[params1['beta_col'] + sumstats_suffixes[0]].astype(float)
+                    df1x['varbeta'] = df_merged[params1['se_col'] + sumstats_suffixes[0]].astype(float) ** 2
+                    df1x['type'] = sumstats1_study_type
+                    df1x['N'] = sumstats1_sample_size
+                    if sumstats1_study_type == 'quant':
+                        df1x['MAF'] = df_merged[params1['maf_col'] + sumstats_suffixes[0]]
+                    df1x['phe_id'] = feature
 
-                output_file1 = os.path.join(out_dir, f'{feature}{sumstats_suffixes[0]}.txt')
-                output_file2 = os.path.join(out_dir, f'{feature}{sumstats_suffixes[1]}.txt')
-                output_snps = os.path.join(out_dir, f'{feature}_snps.txt')
-                output_ld = os.path.join(out_dir, f'{feature}')
+                    df2x['snp'] = df_merged['var_key' + sumstats_suffixes[1]]
+                    df2x['pos'] = df_merged[params2['pos_col'] + sumstats_suffixes[1]].astype(int)
+                    df2x['beta'] = df_merged[params2['beta_col'] + sumstats_suffixes[1]].astype(float)
+                    df2x['varbeta'] = df_merged[params2['se_col'] + sumstats_suffixes[1]].astype(float) ** 2
+                    df2x['type'] = sumstats2_study_type
+                    df2x['N'] = sumstats2_sample_size
+                    if sumstats2_study_type == 'quant':
+                        df2x['MAF'] = df_merged[params2['maf_col'] + sumstats_suffixes[1]]
+                    df2x['phe_id'] = feature2
 
-                df1x.to_csv(output_file1, sep='\t', index=False)
-                df2x.to_csv(output_file2, sep='\t', index=False)
-                df1x['snp'].to_csv(output_snps, sep='\t', index=False, header=False)
+                    output_file1 = os.path.join(out_dir, f'{feature}-{feature2}{sumstats_suffixes[0]}.txt')
+                    output_file2 = os.path.join(out_dir, f'{feature}-{feature2}{sumstats_suffixes[1]}.txt')
+                    output_snps = os.path.join(out_dir, f'{feature}-{feature2}_snps.txt')
+                    output_ld = os.path.join(out_dir, f'{feature}-{feature2}')
 
-                if bfile_for_ld is not None:
-                    cmd = f'plink --bfile {bfile_for_ld} --r square --extract {output_snps} --out {output_ld}'
-                    print(cmd)
-                    subprocess.run(cmd, shell=True, check=True)
-                elif external_ld is not None:
-                    print('Using external LD file, to be implemented.')
+                    df1x.to_csv(output_file1, sep='\t', index=False)
+                    df2x.to_csv(output_file2, sep='\t', index=False)
+                    df1x['snp'].to_csv(output_snps, sep='\t', index=False, header=False)
+
+                    if bfile_for_ld is not None:
+                        cmd = f'plink --bfile {bfile_for_ld} --r square --extract {output_snps} --out {output_ld}'
+                        print(cmd)
+                        subprocess.run(cmd, shell=True, check=True)
+                        try:
+                            os.remove(output_ld + '.log')
+                            os.remove(output_ld + '.nosex')
+                        except:
+                            pass
+                    elif external_ld is not None:
+                        print('Using external LD file, to be implemented.')
 
     def get_coloc_script(self, in_dir, out_script='run_coloc.sh', R_env='QTLtools'):
         ld_files = sorted([f for f in os.listdir(in_dir) if f.endswith('.ld')])
