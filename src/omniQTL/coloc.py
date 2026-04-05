@@ -80,7 +80,7 @@ class Coloc:
 
         df1 = pd.read_table(sumstats1, sep='\t', header=0)
         if sumstats1_sig_file is not None and os.path.exists(sumstats1_sig_file):
-            df_sig = pd.read_table(sumstats1_sig_file, header=0, sep=r'\s+')
+            df_sig = pd.read_table(sumstats1_sig_file, header=None, sep=r'\s+')
             wh = df1.iloc[:, 0].isin(df_sig.iloc[:, 0])
             df1 = df1[wh].copy()
 
