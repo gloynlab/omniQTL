@@ -10,7 +10,7 @@ The package provides a unified framework that spans the entire analysis pipeline
 
 By integrating multi-level molecular phenotypes, omniQTL facilitates a deeper understanding of the genetic architecture underlying complex traits and diseases.
 
-## Pipeline Overview
+## Pipeline
 
 ![](assets/pipeline.png)
 
