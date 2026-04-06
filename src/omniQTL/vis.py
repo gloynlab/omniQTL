@@ -307,22 +307,21 @@ class GenoPhenoBarPlot(GeneTxPlot):
         plt.savefig(out_file)
 
 class GenomeTrackPlot():
-    def __init__(self, config='config.yaml'):
-        if os.path.exists(config):
-            with open(config) as f:
-                self.config = yaml.safe_load(f)
-        else:
-            raise FileNotFoundError(f'{config} not found.')
-        print(self.config)
+    def __init__(self):
+        self.config_list = []
 
-    def read_bed12(self, bed12='Homo_sapiens.GRCh38.115.bed12'):
-        df = pd.read_table(bed12, header=None, sep='\t', low_memory=False)
-        df.columns = ['chrom', 'chromStart', 'chromEnd', 'name', 'score', 'strand',
+    def subset_gene(self, gene='GINS4', bed12='Homo_sapiens.GRCh38.115.bed12', out_file=None, canonical_only=True, flank=1e4, geneBiotype_include=['protein_coding'], geneName_exclude=['.']):
+        if os.path.exists(bed12):
+            df = pd.read_table(bed12, header=None, sep='\t', low_memory=False)
+            df.columns = ['chrom', 'chromStart', 'chromEnd', 'name', 'score', 'strand',
                         'thickStart', 'thickEnd', 'itemRgb', 'blockCount', 'blockSizes', 'blockStarts',
                         'geneID', 'geneName', 'geneBiotype', 'transcriptID', 'transcriptName', 'transcriptBiotype', 'tag']
-        return df
+        else:
+            raise FileNotFoundError(f'{bed12} not found.')
 
-    def subset_gene(self, df, gene='GINS4', canonical_only=True, flank=1e4, geneBiotype_include=['protein_coding'], geneName_exclude=['.']):
+        if out_file is None:
+            out_file = f'gene_{gene}.bed'
+
         wh = df['geneName'].isin([gene])
         df_sub = df[wh]
         if canonical_only:
@@ -341,8 +340,42 @@ class GenomeTrackPlot():
         if canonical_only:
             wh = np.array([True if x.find('canonical') != -1 else False for x in df_sub['tag']])
             df_sub = df_sub[wh]
-        df_sub.to_csv(f'{gene}_subset.bed', sep='\t', index=None, header=None)
+        df_sub.to_csv(out_file, sep='\t', index=None, header=None)
         return window
+
+    def add_tracks(self, gene='PTGFRN', config='config_PTGFRN.yaml', ini_file=None, ylim_off=True):
+        if os.path.exists(config):
+            with open(config) as f:
+                self.config = yaml.safe_load(f)
+                print(f'Number of tracks: {len(self.config)}')
+        else:
+            raise FileNotFoundError(f'{config} not found.')
+
+        if ini_file is None:
+            ini_file = config.replace('.yaml', '.ini')
+        self.ini_file = ini_file
+
+        for track in self.config:
+            self.config_list.append(f'[{track}]')
+            for k, v in self.config[track].items():
+                if v != 'None':
+                    if ylim_off:
+                        if k in ['min_value', 'max_value']:
+                            continue
+                    self.config_list.append(f'{k} = {v}')
+
+        with open(self.ini_file, 'w') as f:
+            f.write('\n'.join(self.config_list))
+
+    def plot_tracks(self, gene, window, width, out_file=None, conda_env='pygenometracks'):
+        if out_file is None:
+            out_file = f'{gene}_tracks.pdf'
+
+        cmd = f'pyGenomeTracks --tracks {self.ini_file} --region {window[0]}:{window[1]}-{window[2]} --width {width} --title {gene} -o {out_file}'
+        if conda_env:
+            cmd = f'conda run -n {conda_env} ' + cmd
+        print(cmd)
+        subprocess.run(cmd, shell=True)
 
 if __name__ == '__main__':
     def plot_locus(gene='PTGFRN', var_id='rs1127215'):
