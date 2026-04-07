@@ -128,26 +128,42 @@ class SeqQC:
                     cmd = f'conda run -n {QTLtools_env} ' + cmd
                 f.write(cmd + '\n')
 
-    def mbv_summary(self, mbv_dir='bams', out_file='mbv_summary.txt'):
+    def get_mbv_results(self, mbv_dir='bams', out_file='mbv_merged.txt', params={'perc_het_consistent':0.8, 'perc_hom_consistent':0.8}):
         fs = sorted([x for x in os.listdir(mbv_dir) if x.endswith('_mbv.txt')])
         L = []
         for f in fs:
-            sample = f.split('_mbv.txt')[0]
-            with open(os.path.join(mbv_dir, f)) as f_in:
-                for line in f_in:
-                    line = line.strip()
-                    if line.startswith('MBV'):
-                        try:
-                            n_total = int(line.split()[2])
-                            n_concordant = int(line.split()[3])
-                            n_discordant = int(line.split()[4])
-                            p_concordant = n_concordant / n_total if n_total > 0 else 0
-                            L.append([sample, n_total, n_concordant, n_discordant, p_concordant])
-                        except:
-                            pass
-        df = pd.DataFrame(L, columns=['sample', 'n_total', 'n_concordant', 'n_discordant', 'p_concordant'])
+            sample = f.split('.bam')[0]
+            df = pd.read_csv(os.path.join(mbv_dir, f), sep=r'\s+')
+            df.insert(0, 'sample', sample)
+            L.append(df)
+        df = pd.concat(L)
         df.to_csv(out_file, index=False, sep='\t')
 
-    def tss_enrichment_atacseq(self):
-        pass
+        wh1 = df['perc_het_consistent'] > params['perc_het_consistent']
+        wh2 = df['perc_hom_consistent'] > params['perc_hom_consistent']
+        df_sub = df[wh1 & wh2]
+        df_sub.sort_values(by=['perc_het_consistent', 'perc_hom_consistent'], ascending=False, inplace=True)
+        out_file = out_file.replace('.txt', '_filtered.txt')
+        df_sub.to_csv(out_file, index=False, sep='\t')
 
+    def get_tss_score(self, qc_dir='qc', out_file='ATACseq_tss_score.txt', score_threshold=5):
+        out_file_low = out_file.replace('.txt', '_low.txt')
+        fs = sorted([x for x in os.listdir(qc_dir) if x.endswith('.json')])
+        L = []
+        for f in fs:
+            sample = f.split('.json')[0]
+            try:
+                with open(os.path.join(qc_dir, f)) as f_in:
+                    data = json.load(f_in)
+                    scores = []
+                    tss = data['align_enrich']['tss_enrich']
+                    for k in tss:
+                        scores.append(tss[k]['tss_enrich'])
+                    L.append([sample, np.mean(scores), ','.join([str(x) for x in scores])])
+            except Exception as e:
+                print(f'Error processing {f} {e}')
+        if L:
+            df = pd.DataFrame(L, columns=['sample', 'mean_tss_score', 'tss_scores'])
+            df.to_csv(out_file, index=False, sep='\t')
+            df_sub = df[df['mean_tss_score'] < score_threshold]
+            df_sub.to_csv(out_file_low, index=False, sep='\t')
