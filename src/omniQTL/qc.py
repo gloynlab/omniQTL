@@ -74,7 +74,7 @@ class SeqQC:
                 cmd = f'samtools flagstat {in_file} > {out_file}'
                 f.write(cmd + '\n')
 
-    def get_numer_reads(self, bam_dir='bams', flag='primary mapped'):
+    def get_number_reads(self, bam_dir='bams', out_file='number_mapped_reads.txt', flag='primary mapped'):
         fs = sorted([x for x in os.listdir(bam_dir) if x.endswith('.flagstat')])
         L = []
         for f in fs:
@@ -88,14 +88,11 @@ class SeqQC:
                             L.append([sample, n])
                         except:
                             pass
-        out_file = f'{bam_dir}/bam_number_reads.txt'
-        df = pd.DataFrame(L, columns=['sample', 'num_reads'])
+        df = pd.DataFrame(L, columns=['sample', 'number_reads'])
+        df.sort_values(by='number_reads', inplace=True)
         df.to_csv(out_file, index=False, sep='\t')
 
-    def plot_number_reads(self, in_file='bams/number_reads.txt'):
-        pass
-
-    def get_percent_mapped_reads(self, bam_dir='bams', flag='primary mapped'):
+    def get_percent_mapped_reads(self, bam_dir='bams', out_file='percent_mapped_reads.txt', flag='primary mapped'):
         fs = sorted([x for x in os.listdir(bam_dir) if x.endswith('.flagstat')])
         L = []
         for f in fs:
@@ -109,8 +106,8 @@ class SeqQC:
                             L.append([sample, p])
                         except:
                             pass
-        out_file = f'{bam_dir}/bam_percent_mapped_reads.txt'
         df = pd.DataFrame(L, columns=['sample', 'percent_mapped_reads'])
+        df.sort_values(by='percent_mapped_reads', inplace=True)
         df.to_csv(out_file, index=False, sep='\t')
 
     def get_mbv_script(self, bam_dir='bams', vcf_file='variants.vcf.gz', out_file='run_mbv.sh', chrom=None, quality=10, QTLtools_env='QTLtools'):
