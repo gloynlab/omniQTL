@@ -161,16 +161,20 @@ class Summary:
         df = pd.DataFrame(L, columns=['peak_type', 'peak_method', 'number_of_peaks'])
         df.to_csv(out_file, index=False, sep='\t')
 
-    def plot_number_merged_peaks(self, in_file='caQTL_number_merged_peaks.txt', out_file='caQTL_number_merged_peaks_barplot.pdf', cmap='Blues', ylabel='Number of merged peaks (million)', figsize=(4, 4)):
+    def plot_number_merged_peaks(self, in_file='caQTL_number_merged_peaks.txt', cmap='Blues', ylabel='Number of merged peaks (million)', figsize=(4, 4)):
+        out_file = in_file.split('.txt')[0] + '_barplot.pdf'
         df = pd.read_table(in_file, header=0, sep='\t')
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot()
         if ylabel.find('million') != -1:
             df['number_of_peaks'] = df['number_of_peaks']/1e6
-        sns.barplot(x='peak_type', y='number_of_peaks', data=df, ax=ax, hue='peak_method', palette=cmap)
+        if df['peak_method'].nunique() > 1:
+            sns.barplot(x='peak_type', y='number_of_peaks', data=df, ax=ax, hue='peak_method', palette=cmap)
+            ax.legend(title=None)
+        else:
+            sns.barplot(x='peak_type', y='number_of_peaks', data=df, ax=ax, hue='peak_type', palette=cmap, legend=False)
         ax.set_xlabel('')
         ax.set_ylabel(ylabel)
-        ax.legend(title=None)
         plt.tight_layout()
         plt.savefig(out_file)
 
