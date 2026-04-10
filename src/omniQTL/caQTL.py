@@ -115,6 +115,10 @@ class CAQTL(QTL, SeqQC):
                             out.write(f'ln {f} {ot}/{sample}.json\n')
 
     def get_consensus_peaks(self, in_dir='peaks_qvalue', out_file='ATACseq_consensus_peaks.bed', threshold=0.05):
+        '''
+        this function is implemented according to the definition of consensus peak from this paper, Currin et al., AJHG 2021 (https://pubmed.ncbi.nlm.nih.gov/34038741/). 
+        '''
+
         fs = sorted([x for x in os.listdir(in_dir) if x.endswith('.narrowPeak.gz')])
         dfs = []
         for f in fs:
@@ -142,7 +146,8 @@ class CAQTL(QTL, SeqQC):
 
     def get_summit_extended_fixed_width_peaks(self, in_dir='peaks_qvalue', out_file='ATACseq_summitExtended_peaks.bed', chrom=None, half_width=250, params={'chrom_col':0, 'start_col':1, 'summit_col':9, 'pval_col':7}):
         '''
-        if the process is too slow on a large number of peaks, consider using the chrom parameter to run the function on each chromosome in parallel and then merge the results. Without the chrom parameter, the function will loop on all the chroms one by one.
+        this function is implemented according to the description of the merge_peaks function in snapatac2 (https://scverse.org/SnapATAC2/api/_autosummary/snapatac2.tl.merge_peaks.html).
+        if the process is too slow on a large number of peaks, consider using the chrom parameter to run the function on each chromosome in parallel and then concat the results. Without providing the chrom parameter, the function will loop on all chroms one by one.
         '''
 
         fs = sorted([x for x in os.listdir(in_dir) if x.endswith('.narrowPeak.gz')])
