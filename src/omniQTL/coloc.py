@@ -134,7 +134,7 @@ class Coloc:
                 if same_gene_only:
                     gene1 = set([feature.split('_')[1]])
                     gene2 = set(feature2.split('_')[-1].split(','))
-                    if not geen1.intersection(gene2):
+                    if not gene1.intersection(gene2):
                         print(f'Skipping feature pair {feature} and {feature2} due to same_gene_only=True.')
                         continue
                 df_merged = pd.merge(df1_sub, df2_sub, left_on='var_key' + sumstats_suffixes[0], right_on='var_key' + sumstats_suffixes[1]).sort_values(by=params1['pos_col'] + sumstats_suffixes[0])
