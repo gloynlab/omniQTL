@@ -689,14 +689,27 @@ class Summary:
         out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
         df.to_csv(out_file, index=False, sep='\t')
 
-    def correlation_plot_pQTL_UKBBplasma(self, in_file='pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_UKB-PPP_pQTL_Euro_sig_rsID.txt.gz', cmap='Blues', title='Correlation of pQTL effect sizes between this study and UKBB plasma pQTLs', xlabel='beta in this study', ylabel='beta in UKBB plasma pQTLs', figsize=(4, 4)):
+    def correlation_plot_pQTL_UKBBplasma(self, in_file='pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_UKB-PPP_pQTL_Euro_sig_rsID.txt.gz', beta_x='slope', beta_y='BETA', cmap='Blues', xlabel='beta, significant pQTL in islets', ylabel='beta, significant pQTL in plasma\n(pvalue < 5e-6, UKBB)', figsize=(4, 4), xlim=[-2, 2], ylim=[-2, 2], line_params={'hline': [[-1.5, 1.5], [0, 0]], 'vline': [[0, 0], [-1.5, 1.5]], 'color': 'orange', 'ls': '--', 'lw': 1}, title=None, color='C0', scatter_size=6):
         out_file = in_file.split('.txt')[0] +  '_correlation.pdf'
         df = pd.read_table(in_file, header=0, sep='\t')
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot()
-        sns.regplot(x='slope', y='BETA', data=df, ax=ax, color='C0')
+        sns.regplot(x=beta_x, y=beta_y, data=df, ax=ax, color=color, scatter_kws={'s': scatter_size})
+
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xticks(range(xlim[0], xlim[1] + 1))
+        ax.set_yticks(range(ylim[0], ylim[1] + 1))
+        ax.plot(line_params['hline'][0], line_params['hline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+        ax.plot(line_params['vline'][0], line_params['vline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+
+        if title is None:
+            wh1 = (df[beta_x]  < 0) & (df[beta_y] < 0)
+            wh2 = (df[beta_x]  > 0) & (df[beta_y] > 0)
+            df_con = df.loc[wh1|wh2, ]
+            title = f'{df_con.shape[0]/df.shape[0]*100:.1f}% shared pQTL\nare concordant in direction'
         ax.set_title(title)
         plt.tight_layout()
         plt.savefig(out_file)
