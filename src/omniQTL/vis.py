@@ -184,6 +184,63 @@ class LocusZoomPlot(GeneTxPlot):
         df.to_csv(f'{gene}_data.txt', sep='\t', index=None)
         return df
 
+class ManhattanPlot():
+    def __init__(self, chrom_size_file='Homo_sapiens.GRCh38.dna.primary_assembly.OneLine.ChrSizeChr.txt', chroms=[str(x) for x in range(1, 23)]):
+        if not os.path.exists(chrom_size_file):
+            raise FileNotFoundError(f'{chrom_size_file} not found')
+        df = pd.read_table(chrom_size_file, header=None, sep='\t')
+        df.columns = ['chrom', 'size']
+        df['ch'] = [x.split('chr')[-1] for x in df['chrom']]
+        df = df[df['ch'].isin(chroms)]
+        self.ch_size = dict(zip(df['ch'], df['size']))
+        ch_size_values = list(self.ch_size.values())
+        self.ch_cu = [sum(ch_size_values[0:n]) for n in range(1, len(ch_size_values) + 1)]
+        self.ch_cu_middle = [sum(ch_size_values[0:n]) + ch_size_values[n]/2 for n in range(0, len(ch_size_values))]
+
+    def scatter_plot(self, ax, df, x='pos_cu', y='pv', s=10, lw=0, hue='significant', palette=['C0', 'C1'], ylabel='-log10(p)', sig_threshold=5e-8, line_params='r--'):
+        sig_th = -np.log10(sig_threshold)
+        df['significant'] = df[y].astype(float) > sig_th
+        sns.scatterplot(x=x, y=y, data=df, s=s, lw=lw, hue=hue, palette=palette, ax=ax, legend=False)
+        ax.set_xlabel('')
+        ax.set_ylabel(ylabel)
+        ax.plot([0, df[x].max()], [sig_th, sig_th], line_params)
+
+    def bgzip_to_df(self, bgzip_file, chrom_col='var_chr', pos_col='var_from', pv_col='adj_beta_pval', pv_min=1e-300, unique_variants=True, var_id='var_id'):
+        if not os.path.exists(bgzip_file):
+            raise FileNotFoundError(f'{bgzip_file} not found')
+
+        df = pd.read_table(bgzip_file, header=0, sep='\t')
+        df['ch'] = [str(x).split('chr')[-1] for x in df[chrom_col]]
+        df = df[df['ch'].isin(self.ch_size)]
+        df['pv'] = -np.log10(df[pv_col].astype(float).clip(lower=pv_min))
+        if unique_variants:
+            df.sort_values([var_id, pv_col], inplace=True)
+            df.drop_duplicates(subset=var_id, keep='first', inplace=True)
+
+        L = []
+        for n in range(df.shape[0]):
+            ch = df['ch'].iloc[n]
+            pos = df[pos_col].iloc[n]
+            ch_size_keys = list(self.ch_size.keys())
+            pos_cu = sum([self.ch_size[k] if ch_size_keys.index(k) < ch_size_keys.index(ch) else 0 for k in ch_size_keys]) + pos
+            L.append(pos_cu)
+        df['pos_cu'] = L
+        return df
+
+    def plot_chroms(self, ax, show_xticklabels=True, xticklabels_masked=['17', '19', '21'], color_bg='grey', alpha_bg=0.2):
+        ax.set_xlim(0, self.ch_cu[-1])
+        ax.set_xticks(self.ch_cu_middle)
+        if show_xticklabels:
+            ax.set_xticklabels([x if x not in xticklabels_masked else '' for x in self.ch_size])
+        else:
+            ax.set_xticklabels([])
+        [ax.axvspan(self.ch_cu[n], self.ch_cu[n+1], facecolor=color_bg, alpha=alpha_bg) for n in range(0, len(self.ch_cu) - 1, 2)]
+
+    def get_top_signals(self, df, pv_col='pv', top_n=20):
+        df_sorted = df.sort_values(pv_col, ascending=False)
+        df_top = df_sorted.head(top_n)
+        return df_top
+
 class GenoPhenoBarPlot(GeneTxPlot):
     def __init__(self):
         pass

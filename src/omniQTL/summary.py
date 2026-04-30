@@ -635,8 +635,8 @@ class Summary:
         df_out = pd.DataFrame(L, columns=cols)
         df_out.to_csv(out_file, index=False, sep='\t')
 
-    def bar_plot_overlap_eQTL_GTEx(self, in_file='QTL_sig_pair_overlap_gtex_count.txt', cmap='Dark2', title='Overlap between eQTL and GTEx', subset_renaming_file='subset_renaming.txt', ratio_base='GTEx_sig_pair_count', figsize=(4, 4)):
-        out_file = in_file.replace('.txt', '_barplot.pdf')
+    def bar_plot_overlap_eQTL_GTEx(self, in_file='QTL_sig_pair_overlap_gtex_count.txt', cmap='colorblind', title='Overlap between eQTL and GTEx', subset_renaming_file='subset_renaming.txt', ratio_base='eQTL_sig_pair_count', figsize=(4, 4)):
+        out_file = in_file.replace('.txt', f'_on_{ratio_base.split("_")[0]}_barplot.pdf')
         D = {}
         if os.path.exists(subset_renaming_file):
             df_subset = pd.read_table(subset_renaming_file, header=None, sep='\t')
@@ -648,15 +648,20 @@ class Summary:
         else:
             df['Tissue'] = [x.split('_')[0] for x in df['file']]
         df['ratio'] = df['overlap_count']/df[ratio_base] * 100
-        df.sort_values('ratio', inplace=True, ascending=False)
+
+        T = {}
+        for gi, g in df.groupby('Tissue'):
+            T[gi] = g['ratio'].mean()
+        df['ratio_mean'] = df['Tissue'].map(T)
+        df.sort_values('ratio_mean', inplace=True, ascending=False)
 
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot()
-        sns.barplot(x='Tissue', y='ratio', data=df, ax=ax, palette=cmap, hue='Tissue', legend=False)
-        ax.set_ylabel('Percent of significant gene-variant pairs')
+        sns.barplot(x='Tissue', y='ratio', data=df, ax=ax, palette=cmap, hue='Tissue', legend=False, capsize=0.1)
+        ax.set_ylabel('Percent of significant\ngene-variant pairs')
         ax.set_xlabel('')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-        ax.set_title(title)
+        ax.set_title(title, fontsize=14)
         plt.tight_layout()
         plt.savefig(out_file)
 
@@ -683,3 +688,15 @@ class Summary:
         df = pd.merge(df, df2, on='pair', how='inner')
         out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
         df.to_csv(out_file, index=False, sep='\t')
+
+    def correlation_plot_pQTL_UKBBplasma(self, in_file='pQTL_nominal-1.0_w1M_PC25_extraInfo_sig_UKB-PPP_pQTL_Euro_sig_rsID.txt.gz', cmap='Blues', title='Correlation of pQTL effect sizes between this study and UKBB plasma pQTLs', xlabel='beta in this study', ylabel='beta in UKBB plasma pQTLs', figsize=(4, 4)):
+        out_file = in_file.split('.txt')[0] +  '_correlation.pdf'
+        df = pd.read_table(in_file, header=0, sep='\t')
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.regplot(x='slope', y='BETA', data=df, ax=ax, color='C0')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        plt.tight_layout()
+        plt.savefig(out_file)
