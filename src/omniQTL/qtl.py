@@ -357,14 +357,14 @@ class QTL:
                         maf = item.split('=')[-1]
                         break
                 ch_pos = '.'
-                try:
-                    if converter is not None:
+                if converter is not None:
+                    try:
                         res = converter[chrom][int(pos)]
                         if res:
                             chrom_new, pos_new = res[0][0], res[0][1]
-                        ch_pos = f'{chrom_new}_{pos_new}'
-                except Exception as e:
-                    print(f'Error in liftover for {chrom}:{pos}, {e}')
+                            ch_pos = f'{chrom_new}_{pos_new}'
+                    except Exception as e:
+                        print(f'Error in liftover for {chrom}:{pos}, {e}')
                 D.setdefault(var_id, [])
                 D[var_id].append([alt, ref, maf, ch_pos])
 
