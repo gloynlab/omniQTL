@@ -67,7 +67,7 @@ class Summary:
         for f in in_files:
             qtl = f.split('_')[0]
             genes = []
-            df = pd.read_table(f, header=0, sep=r'\s+')
+            df = pd.read_table(f, header=None, sep=r'\s+')
             if qtl in ['caQTL']:
                 for item in df.iloc[:, 0]:
                     x = item.split('_')[-1].split(',')
