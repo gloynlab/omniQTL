@@ -100,6 +100,8 @@ class QTL:
                         else:
                             start = int(D[gene_id][4]) - 1
                             end = int(D[gene_id][4])
+                        gid = gene_id
+                        pid = gene_id + '_' + gene_name
                     elif qtl_type in ['eQTLexon', 'sQTL']:
                         fields = df.iloc[n, 0].split('_')
                         if strand == '+':
@@ -108,11 +110,9 @@ class QTL:
                         else:
                             start = int(fields[2]) - 1
                             end = int(fields[2])
-                    gid = gene_id
-                    pid = gene_id + '_' + gene_name
-                else:
-                    chrom, start, end, pid, gid, strand = ['.', '.', '.', '.', '.', '.']
-                L.append([chrom, start, end, pid, gid, strand])
+                        gid = gene_id
+                        pid = df.iloc[n, 0] + '_' + gene_name
+                    L.append([chrom, start, end, pid, gid, strand])
             df_feat = pd.DataFrame(L, columns=['#Chr', 'start', 'end', 'pid', 'gid', 'strand'])
 
         df = pd.concat([df_feat, df_sample], axis=1)
