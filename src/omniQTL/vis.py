@@ -432,9 +432,9 @@ class GenomeTrackPlot():
         with open(self.ini_file, 'w') as f:
             f.write('\n'.join(self.config_list))
 
-    def plot_tracks(self, gene, window, width, out_file=None, out_format='pdf', conda_env='pygenometracks'):
+    def plot_tracks(self, gene, window, width, out_file=None, conda_env='pygenometracks'):
         if out_file is None:
-            out_file = f'{gene}_tracks.{out_format}'
+            out_file = f'{gene}_tracks.pdf'
 
         cmd = f'pyGenomeTracks --tracks {self.ini_file} --region {window[0]}:{window[1]}-{window[2]} --width {width} --title {gene} -o {out_file}'
         if conda_env:
