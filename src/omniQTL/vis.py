@@ -413,7 +413,14 @@ class GenomeTrackPlot():
             ini_file = config.replace('.yaml', '.ini')
         self.ini_file = ini_file
 
+        config = {}
         for track in self.config:
+            if 'file' in self.config[track] and not os.path.exists(self.config[track]['file']):
+                pass
+            else:
+                config[track] = self.config[track]
+
+        for track in config:
             self.config_list.append(f'[{track}]')
             for k, v in self.config[track].items():
                 if v != 'None':
