@@ -363,7 +363,7 @@ class GenoPhenoBarPlot(GeneTxPlot):
         plt.tight_layout()
         plt.savefig(out_file)
 
-class GenomeTrackPlot():
+class GenomeTracks():
     def __init__(self):
         self.config_list = []
 
@@ -526,3 +526,83 @@ if __name__ == '__main__':
         geno_pheo_bar_plot(geno_file=eqtl_vcf, pheno_file=eqtl_bed, gene='PTGFRN', var_id='rs1127215', label='eQTL', color=cmap[0])
         geno_pheo_bar_plot(geno_file=caqtl_vcf, pheno_file=caqtl_bed, gene='PTGFRN', var_id='rs1127215', label='caQTL_peak_chr1_116988204_116989436', color=cmap[1], extra_filter='chr1_116988204_116989436_PTGFRN')
         geno_pheo_bar_plot(geno_file=pqtl_vcf, pheno_file=pqtl_bed, gene='PTGFRN', var_id='rs1127215', label='pQTL', transform='power2', color=cmap[2])
+
+class GenomeBrowser():
+    def __init__(self):
+        pass
+    
+    def get_hub_config(self, in_file='track_config.txt', out_file='hub.config.json'):
+        df = pd.read_table(in_file, sep='\t', header=0, dtype=str)
+        L = []
+        for n in range(df.shape[0]):
+            file = df['url'].iloc[n]
+            if os.path.exists(file):
+                D = {}
+                D.setdefault('options', {})
+                for col in df.columns:
+                    if col.startswith('options_'):
+                        col2 = col.replace('options_', '')
+                        val = df[col].iloc[n]
+                        if col2 in ['height']:
+                            val = int(val)
+                        D['options'][col2] = val
+                    else:
+                        val = df[col].iloc[n]
+                        D[col] = val
+                L.append(D)
+        
+        with open(out_file, 'w') as f:
+            json.dump(L, f, indent=4)
+
+    def gwas_to_bed(self, in_file='T2D_GGI_EUR_sumstat_harmoniser.h.tsv.gz', out_file='T2D_GGI_EUR.bed.gz', p_param=1e-300):
+        out_file = out_file.replace('.bed.gz', '.bed')
+        with gzip.open(in_file, 'rt') as f, open(out_file, 'w') as fo:
+            head = f.readline()
+            for line in f:
+                line = line.strip()
+                fields = line.split('\t')
+                try:
+                    chrom = 'chr' + fields[0]
+                    pos = int(fields[1])
+                    p = float(fields[7])
+                    p_min = max(p, p_param)
+                    log_p = -1 * np.log10(p_min)
+                    fo.write(f"{chrom}\t{pos-1}\t{pos}\t{log_p}\n")
+                except:
+                    pass
+
+        subprocess.run(f'sort -k1,1V -k2,2n {out_file} |bgzip > {out_file}.gz', shell=True)
+        subprocess.run(f'tabix -p bed {out_file}.gz; rm {out_file}', shell=True)
+
+    def qtl_to_bed(self, in_file='eQTL_nominal-1.0_w1M_PC25_extraInfo.txt.gz', out_file='eQTL.bed.gz', p_param=1e-300):
+        out_file = out_file.replace('.bed.gz', '.bed')
+        D = {}
+        with gzip.open(in_file, 'rt') as f:
+            head = f.readline().strip().split('\t')
+            idx_var_id = head.index('var_id')
+            idx_chrom = head.index('var_chr')
+            idx_pos = head.index('var_from')
+            idx_p = head.index('nom_pval')
+            for line in f:
+                line = line.strip()
+                fields = line.split('\t')
+                try:
+                    var_id = fields[idx_var_id]
+                    chrom = fields[idx_chrom]
+                    pos = int(fields[idx_pos])
+                    p = float(fields[idx_p])
+                    D.setdefault(var_id, [])
+                    D[var_id].append([chrom, pos, p])
+                except:
+                    pass
+
+        with open(out_file, 'w') as fo:
+            for var_id in sorted(D):
+                L = sorted(D[var_id], key=lambda x: x[2])
+                chrom, pos, p = L[0]
+                p_min = max(p, p_param)
+                log_p = -1 * np.log10(p_min)
+                fo.write(f"{chrom}\t{pos-1}\t{pos}\t{log_p}\n")
+
+        subprocess.run(f'sort -k1,1V -k2,2n {out_file} |bgzip > {out_file}.gz', shell=True)
+        subprocess.run(f'tabix -p bed {out_file}.gz; rm {out_file}', shell=True)
