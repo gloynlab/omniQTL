@@ -543,13 +543,18 @@ class GenomeBrowser():
                     if col.startswith('options_'):
                         col2 = col.replace('options_', '')
                         val = df[col].iloc[n]
-                        if col2 in ['height']:
-                            val = int(val)
-                        D['options'][col2] = val
+                        if val is not np.nan:
+                            if col2 in ['height']:
+                                val = int(val)
+                            elif col2 in ['category']:
+                                val = json.loads(val)
+                            D['options'][col2] = val
                     else:
                         val = df[col].iloc[n]
                         D[col] = val
                 L.append(D)
+            else:
+                print(f'File {file} not found.')
         
         with open(out_file, 'w') as f:
             json.dump(L, f, indent=4)

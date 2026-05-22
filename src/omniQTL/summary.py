@@ -714,3 +714,13 @@ class Summary:
         ax.set_title(title)
         plt.tight_layout()
         plt.savefig(out_file)
+
+    def get_overlap_sig_pair_eQTLexon_sQTL(self, in_file='eQTLexon_nominal-1.0_w100k_PC25_extraInfo_sig.txt.gz', in_file2='sQTL_nominal-1.0_w100k_PC25_extraInfo_sig.txt.gz'):
+        df1 = pd.read_table(in_file, header=0, sep='\t', low_memory=False)
+        df2 = pd.read_table(in_file2, header=0, sep='\t', low_memory=False)
+        df1['ExonID'] = df1['phe_id'].apply(lambda x: x.split('_')[3])
+        df2['ExonID'] = df2['phe_id'].apply(lambda x: x.split('_')[3])
+
+        df = pd.merge(df1, df2, on=['var_id', 'ExonID'], suffixes=('_eQTLexon', '_sQTL'))
+        out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
+        df.to_csv(out_file, index=False, sep='\t')
