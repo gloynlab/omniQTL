@@ -40,7 +40,7 @@ class Summary:
     
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes(axes)
-        sns.barplot(y='Number of significant loci', x='StudySampleSize', hue='StudySampleSize', data=df, palette=[cmap[0], cmap[-1], cmap[1], cmap[-1], cmap[2]], legend=False)
+        sns.barplot(y='Number of significant loci', x='StudySampleSize', hue='StudySampleSize', data=df, palette=[cmap[0], cmap[-1], cmap[1], cmap[-1], cmap[2]], legend=False, linewidth=1, edgecolor='black')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
         ax.set_xlabel('')
         if show_numbers:
@@ -50,8 +50,8 @@ class Summary:
         ylim = ax.get_ylim()
         ax.set_ylim(ylim[0], ylim[1] * 1.1)
 
-        y1 = -0.55
-        y2 = -0.6
+        y1 = -0.6
+        y2 = -0.65
         ax.plot([0, 0, 1, 1], [y1, y2, y2, y1], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
         ax.plot([2, 2, 3, 3], [y1, y2, y2, y1], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
         ax.plot([4, 4], [y1, y2], transform=ax.get_xaxis_transform(), lw=1, color='k', clip_on=False)
@@ -715,6 +715,57 @@ class Summary:
         plt.tight_layout()
         plt.savefig(out_file)
 
+    def get_overlap_sig_pair_eQTL_InsPIRE(self, in_file='eQTL_nominal-1.0_w1M_PC25_extraInfo_sig.txt.gz', in_file2='InsPIRE_Gene_eQTL.txt'):
+        df = pd.read_table(in_file, header=0, sep='\t')
+        df2 = pd.read_table(in_file2, header=0, sep='\t')
+
+        pairs = []
+        for n in range(df.shape[0]):
+            gene = df['phe_id'].iloc[n].split('_')[-1]
+            rs = df['var_id'].iloc[n]
+            pair = f'{gene}_{rs}'
+            pairs.append(pair)
+        df['pair'] = pairs
+
+        pairs2 = []
+        for n in range(df2.shape[0]):
+            gene = df2['GeneName'].iloc[n]
+            rs = df2['SNPid'].iloc[n]
+            pair = f'{gene}_{rs}'
+            pairs2.append(pair)
+        df2['pair'] = pairs2
+
+        df = pd.merge(df, df2, on='pair', how='inner')
+        out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
+        df.to_csv(out_file, index=False, sep='\t')
+
+    def correlation_plot_eQTL_InsPIRE(self, in_file='eQTL_nominal-1.0_w1M_PC25_extraInfo_sig_InsPIRE_Gene_eQTL.txt', beta_x='slope', beta_y='Slope', cmap='Blues', xlabel='beta, significant eQTL', ylabel='beta, significant eQTL (InsPIRE)', figsize=(4, 4), xlim=[-2, 2], ylim=[-2, 2], line_params={'hline': [[-1.5, 1.5], [0, 0]], 'vline': [[0, 0], [-1.5, 1.5]], 'color': 'orange', 'ls': '--', 'lw': 1}, title=None, color='C0', scatter_size=6):
+        out_file = in_file.split('.txt')[0] +  '_correlation.pdf'
+        df = pd.read_table(in_file, header=0, sep='\t')
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.regplot(x=beta_x, y=beta_y, data=df, ax=ax, color=color, scatter_kws={'s': scatter_size})
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xticks(range(xlim[0], xlim[1] + 1))
+        ax.set_yticks(range(ylim[0], ylim[1] + 1))
+        ax.plot(line_params['hline'][0], line_params['hline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+        ax.plot(line_params['vline'][0], line_params['vline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+
+        if title is None:
+            wh1 = (df[beta_x]  < 0) & (df[beta_y] < 0)
+            wh2 = (df[beta_x]  > 0) & (df[beta_y] > 0)
+            df_con = df.loc[wh1|wh2, ]
+            title = f'{df_con.shape[0]/df.shape[0]*100:.1f}% shared eQTL\nare concordant in direction'
+        ax.set_title(title)
+        plt.tight_layout()
+        plt.savefig(out_file)
+
+
+
     def get_overlap_sig_pair_eQTLexon_sQTL(self, in_file='eQTLexon_nominal-1.0_w100k_PC25_extraInfo_sig.txt.gz', in_file2='sQTL_nominal-1.0_w100k_PC25_extraInfo_sig.txt.gz'):
         df1 = pd.read_table(in_file, header=0, sep='\t', low_memory=False)
         df2 = pd.read_table(in_file2, header=0, sep='\t', low_memory=False)
@@ -724,3 +775,30 @@ class Summary:
         df = pd.merge(df1, df2, on=['var_id', 'ExonID'], suffixes=('_eQTLexon', '_sQTL'))
         out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
         df.to_csv(out_file, index=False, sep='\t')
+
+    def correlation_plot_eQTLexon_sQTL(self, in_file='eQTLexon_nominal-1.0_w100k_PC25_extraInfo_sig_sQTL_nominal-1.0_w100k_PC25_extraInfo_sig.txt.gz', beta_x='slope_eQTLexon', beta_y='slope_sQTL', cmap='Blues', xlabel='beta, significant eQTL on exon level', ylabel='beta, significant sQTL', figsize=(4, 4), xlim=[-2, 2], ylim=[-2, 2], line_params={'hline': [[-1.5, 1.5], [0, 0]], 'vline': [[0, 0], [-1.5, 1.5]], 'color': 'orange', 'ls': '--', 'lw': 1}, title=None, color='C1', scatter_size=1):
+        out_file = in_file.split('.txt')[0] +  '_correlation.pdf'
+        df = pd.read_table(in_file, header=0, sep='\t')
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot()
+        sns.regplot(x=beta_x, y=beta_y, data=df, ax=ax, color=color, scatter_kws={'s': scatter_size})
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xticks(range(xlim[0], xlim[1] + 1))
+        ax.set_yticks(range(ylim[0], ylim[1] + 1))
+        ax.plot(line_params['hline'][0], line_params['hline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+        ax.plot(line_params['vline'][0], line_params['vline'][1], color=line_params['color'], ls=line_params['ls'], lw=line_params['lw'])
+
+        if title is None:
+            wh1 = (df[beta_x]  < 0) & (df[beta_y] < 0)
+            wh2 = (df[beta_x]  > 0) & (df[beta_y] > 0)
+            df_con = df.loc[wh1|wh2, ]
+            title = f'{df_con.shape[0]/df.shape[0]*100:.1f}% shared exon\nare concordant in direction'
+        ax.set_title(title)
+        plt.tight_layout()
+        plt.savefig(out_file)
+
+
