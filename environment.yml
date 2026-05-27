@@ -13,6 +13,7 @@ dependencies:
   - plink=1.90b7.7
   - plink2=2.0.0a.6.9
   - bcftools=1.22
+  - pyarrow=23.0.1
   - perl
   - pip
   - pip:

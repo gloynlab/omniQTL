@@ -739,7 +739,7 @@ class Summary:
         out_file = in_file.split('.txt.gz')[0] + '_' + in_file2
         df.to_csv(out_file, index=False, sep='\t')
 
-    def correlation_plot_eQTL_InsPIRE(self, in_file='eQTL_nominal-1.0_w1M_PC25_extraInfo_sig_InsPIRE_Gene_eQTL.txt', beta_x='slope', beta_y='Slope', cmap='Blues', xlabel='beta, significant eQTL', ylabel='beta, significant eQTL (InsPIRE)', figsize=(4, 4), xlim=[-2, 2], ylim=[-2, 2], line_params={'hline': [[-1.5, 1.5], [0, 0]], 'vline': [[0, 0], [-1.5, 1.5]], 'color': 'orange', 'ls': '--', 'lw': 1}, title=None, color='C0', scatter_size=6):
+    def correlation_plot_eQTL_InsPIRE(self, in_file='eQTL_nominal-1.0_w1M_PC25_extraInfo_sig_InsPIRE_Gene_eQTL.txt', beta_x='slope', beta_y='Slope', cmap='Blues', xlabel='beta, significant eQTL in islets', ylabel='beta, significant eQTL in islets\n(InsPIRE)', figsize=(4, 4), xlim=[-2, 2], ylim=[-2, 2], line_params={'hline': [[-1.5, 1.5], [0, 0]], 'vline': [[0, 0], [-1.5, 1.5]], 'color': 'orange', 'ls': '--', 'lw': 1}, title=None, color='C0', scatter_size=6):
         out_file = in_file.split('.txt')[0] +  '_correlation.pdf'
         df = pd.read_table(in_file, header=0, sep='\t')
         fig = plt.figure(figsize=figsize)
