@@ -31,7 +31,7 @@ class Summary:
         plt.tight_layout()
         plt.savefig(out_file)
 
-    def bar_plot_significant_loci(self, in_file, axes=[0.3, 0.4, 0.6, 0.5], cmap='Dark2', show_numbers=True, figsize=(4, 4)):
+    def bar_plot_significant_loci(self, in_file, axes=[0.3, 0.4, 0.6, 0.5], cmap='Dark2', show_numbers=True, figsize=(4, 4), ylabel='Number of significant signals'):
         out_file = in_file.split('.txt')[0] + '.pdf'
         cmap = sns.color_palette(cmap)
 
@@ -43,6 +43,8 @@ class Summary:
         sns.barplot(y='Number of significant loci', x='StudySampleSize', hue='StudySampleSize', data=df, palette=[cmap[0], cmap[-1], cmap[1], cmap[-1], cmap[2]], legend=False, linewidth=1, edgecolor='black')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
         ax.set_xlabel('')
+        if ylabel:
+            ax.set_ylabel(ylabel)
         if show_numbers:
             for i, row in df.iterrows():
                 N = row['Number of significant loci']
