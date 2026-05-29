@@ -125,3 +125,13 @@ def annotate_vcf_with_vep(vcf_file, vep_env='vep115', vep_cache='vep_cache', spe
         fout.write(cmd + '\n')
         cmd = f'gzip {out_file}'
         fout.write(cmd + '\n')
+
+def encrypt_files_for_ega(in_dir='fastq', pubkey='ingestion.pubkey', out_file='encrypt.sh'):
+    out_dir = in_dir + '_encrypted'
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+
+    with open(out_file, 'w') as fout:
+        for f in os.listdir(in_dir):
+            fo = f + '.c4gh'
+            fout.write(f'crypt4gh encrypt --recipient_pk {pubkey} < {in_dir}/{f} > {out_dir}/{fo}\n')

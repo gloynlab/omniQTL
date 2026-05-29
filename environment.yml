@@ -14,6 +14,7 @@ dependencies:
   - plink2=2.0.0a.6.9
   - bcftools=1.22
   - pyarrow=23.0.1
+  - python-crypt4gh=1.8.6
   - perl
   - pip
   - pip:
