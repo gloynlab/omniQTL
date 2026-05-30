@@ -137,6 +137,17 @@ class EGAsubmitter:
                 fo = f + '.c4gh'
                 fout.write(f'crypt4gh encrypt --recipient_pk {pubkey} < {in_dir}/{f} > {out_dir}/{fo}\n')
 
+    def upload_files_to_ega(self, local_dir='fastq_encrypted', remote_dir='/encrypted/fastq', threads=8, username='username', password='password', host='sftp://inbox.ega-archive.org', out_file='upload.sh'):
+        if not os.path.exists(local_dir):
+            raise ValueError(f'Local directory {local_dir} does not exist.')
+
+        with open(out_file, 'w') as f:
+            f.write('#!/bin/bash\n')
+            cmd = f'lftp -u "{username}","{password}" "{host}"'
+            print(cmd)
+            f.write(f'{cmd} <<EOF\n')
+            f.write(f'mirror -R --parallel={threads} "{local_dir}" "{remote_dir}"\n')
+
     def get_sample_run_tables(self, in_dir='fastq', sample_out_file='samples.csv', run_out_file='runs.csv', prefix='rnaseq', sample_header=['alias', 'title', 'description', 'biological_sex', 'subject_id', 'phenotype', 'biosample_id', 'case_control', 'organism_part', 'cell_line']):
         D = {}
         for f in os.listdir(in_dir):
