@@ -147,6 +147,7 @@ class EGAsubmitter:
             print(cmd)
             f.write(f'{cmd} <<EOF\n')
             f.write(f'mirror -R --parallel={threads} "{local_dir}" "{remote_dir}"\n')
+            f.write('bye\nEOF\n')
 
     def get_sample_run_tables(self, in_dir='fastq', sample_out_file='samples.csv', run_out_file='runs.csv', prefix='rnaseq', sample_header=['alias', 'title', 'description', 'biological_sex', 'subject_id', 'phenotype', 'biosample_id', 'case_control', 'organism_part', 'cell_line']):
         D = {}
