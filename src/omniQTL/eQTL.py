@@ -254,7 +254,7 @@ class EQTL(QTL, SeqQC):
                 fout.write('\t'.join(L) + '\n')
                 fout2.write('\t'.join(L2) + '\n')
 
-    def annotate_gene_name(self, gene_table='GRCh38.115_GenePosType.txt', in_file='eQTL_geneCounts.txt'):
+    def annotate_gene_name(self, in_file='eQTL_geneCounts.txt', gene_table='GRCh38.115_GenePosType.txt'):
         if not os.path.exists(gene_table):
             raise ValueError(f'{gene_table} is not found, run gtf_to_GenePosType in utils.py on the gtf file first')
 
