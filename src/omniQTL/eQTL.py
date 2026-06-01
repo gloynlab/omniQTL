@@ -12,21 +12,21 @@ class EQTL(QTL, SeqQC):
         with open(out_file, 'w') as out:
             out.write(cmd + '\n')
 
-    def ranseq_mapping(self, out_file='mapping.sh', fq_dir='.', n_threads=4, flag='NH HI AS nM XS', genome_dir='GRCh38_STAR'):
+    def ranseq_mapping(self, out_file='mapping.sh', fq_dir='.', flag='NH HI AS nM XS', n_threads=4, genome_dir='GRCh38_STAR'):
         self.samples = []
         fqs = sorted([x for x in os.listdir(fq_dir) if x.endswith('.fq.gz') or x.endswith('.fastq.gz')])
         D = {}
         for fq in fqs:
-            sample = fq.split('_1')[0].split('_2')[0].split('.fq.gz')[0].split('.fastq.gz')[0]
+            sample = fq.split('_1')[0].split('_2')[0].split('_R1')[0].split('_R2')[0]
             D.setdefault(sample, {})
             D[sample].setdefault('fq', [])
             D[sample].setdefault('fq1', [])
             D[sample].setdefault('fq2', [])
             if fq_dir != '.':
                 fq = f'{fq_dir}/{fq}'
-            elif fq.find('_1') != -1:
+            if fq.find('_1') != -1 or fq.find('_R1') != -1:
                 D[sample]['fq1'].append(fq)
-            elif fq.find('_2') != -1:
+            elif fq.find('_2') != -1 or fq.find('_R2') != -1:
                 D[sample]['fq2'].append(fq)
             else:
                 D[sample]['fq'].append(fq)
@@ -45,7 +45,7 @@ class EQTL(QTL, SeqQC):
                 outfile.write(cmd + '\n')
                 self.samples.append(sample)
 
-    def counting_genes(self, out_file='counting_genes.sh', gtf_file='GRCh38.115.gtf', strand=0, min_quality=30, n_threads=4):
+    def counting_genes(self, out_file='counting_genes.sh', strand=0, min_quality=30, n_threads=4, gtf_file='GRCh38.115.gtf'):
         with open(out_file, 'w') as outfile:
             for sample in self.samples:
                 bam = f'{sample}_Aligned.sortedByCoord.out.bam'
