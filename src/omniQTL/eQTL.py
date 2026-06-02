@@ -254,19 +254,19 @@ class EQTL(QTL, SeqQC):
                 fout.write('\t'.join(L) + '\n')
                 fout2.write('\t'.join(L2) + '\n')
 
-    def annotate_gene_name(self, in_file='eQTL_geneCounts.txt', gene_table='GRCh38.115_GenePosType.txt'):
+    def annotate_gene_name(self, in_file='eQTL_geneCounts.txt', gene_table='GRCh38.115_GenePosType.txt', sep='\t'):
         if not os.path.exists(gene_table):
             raise ValueError(f'{gene_table} is not found, run gtf_to_GenePosType in utils.py on the gtf file first')
 
-        out_file = in_file.replace('.txt', '_geneName.txt')
+        out_file = in_file.split('.txt')[0].split('.csv')[0] + '_geneName.txt'
         df = pd.read_table(gene_table, header=None)
         D = dict(zip(df[0], df[1]))
         with open(in_file, 'r') as f, open(out_file, 'w') as fout:
-            head = f.readline().strip().split('\t')
+            head = f.readline().strip().split(sep)
             fout.write('\t'.join(head[0:1] + ['GeneName'] + head[1:]) + '\n')
             for line in f:
                 line = line.strip()
-                fields = line.split('\t')
+                fields = line.split(sep)
                 gene_id = fields[0]
                 gene_name = D.get(gene_id, gene_id)
                 fout.write('\t'.join([gene_id, gene_name] + fields[1:]) + '\n')
