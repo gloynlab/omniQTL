@@ -267,7 +267,7 @@ class EQTL(QTL, SeqQC):
             for line in f:
                 line = line.strip()
                 fields = line.split(sep)
-                gene_id = fields[0]
+                gene_id = fields[0].split('.')[0]
                 gene_name = D.get(gene_id, gene_id)
                 fout.write('\t'.join([gene_id, gene_name] + fields[1:]) + '\n')
 
