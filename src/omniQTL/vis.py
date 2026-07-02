@@ -132,6 +132,7 @@ class LocusZoomPlot(GeneTxPlot):
         x_max = window[2]
         res = tb.query(chrom, x_min, x_max)
         df = pd.DataFrame(res)
+        df.iloc[:, -1] = df.iloc[:, -1].str.replace('\r', '')
         df.columns = header.columns
         if gene:
             wh = [True if gene in x.split('_')[-1].split(',') else False for x in df['phe_id']]

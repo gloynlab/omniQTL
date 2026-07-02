@@ -183,15 +183,18 @@ class Coloc:
                         print('Using external LD file, to be implemented.')
 
     def get_coloc_script(self, in_dir, out_script='run_coloc.sh', R_env='QTLtools'):
+        in_files = os.listdir(in_dir)
         ld_files = sorted([f for f in os.listdir(in_dir) if f.endswith('.ld')])
         with open(out_script, 'w') as f:
             for ld in ld_files:
                 ss1 = ld.split('.ld')[0] + '_ss1.txt'
                 ss2 = ld.split('.ld')[0] + '_ss2.txt'
-                cmd = f'Rscript {self.coloc_R_script} {in_dir}/{ss1} {in_dir}/{ss2} {in_dir}/{ld}'
-                if R_env is not None:
-                    cmd = f'conda run -n {R_env} ' + cmd
-                f.write(cmd + '\n')
+                out_file = ld.split('.ld')[0] + '_coloc.txt'
+                if out_file not in in_files:
+                    cmd = f'Rscript {self.coloc_R_script} {in_dir}/{ss1} {in_dir}/{ss2} {in_dir}/{ld}'
+                    if R_env is not None:
+                        cmd = f'conda run -n {R_env} ' + cmd
+                    f.write(cmd + '\n')
 
     def merge_coloc_results(self, in_dir, parmas={'PP.H4.abf':0.8}):
         out_file = in_dir + '_results.txt'

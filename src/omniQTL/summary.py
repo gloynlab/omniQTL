@@ -18,7 +18,7 @@ class Summary:
         df['observed'] = -np.log10(df['min_p'])
         df.to_csv(out_file, index=False, sep='\t')
 
-    def qq_plot(self, in_file, title='QQ plot', markerscale=4, scatter_size=4, color='C1', figsize=(4, 4)):
+    def qq_plot(self, in_file, title='QQ plot', scatter_size=4, color='C1', figsize=(4, 4)):
         out_file = in_file.replace('.txt', '.pdf')
         df = pd.read_table(in_file, header=0, sep='\t')
         fig = plt.figure(figsize=figsize)
@@ -119,6 +119,42 @@ class Summary:
         ax = UpSet(D2, subset_size="count", facecolor=color, show_counts=True)
         ax.plot()
         plt.savefig(out_file)
+
+    def get_summary_table_donor_qc(self, in_files=['caQTL_samples.txt', 'eQTL_samples.txt', 'pQTL_samples.txt', 'GSIS_samples.txt'], in_files2=['ATACseq_number_mapped_reads.txt', 'RNAseq_number_mapped_reads.txt', 'ATACseq_tss_score.txt', 'RNAseq_data_source.txt'], in_files3=['ATACseq_number_peaks_by_qvalue.txt'], out_file='donor_qc_summary.txt', cols=['donor_id', 'caQTL', 'eQTL', 'pQTL', 'GSIS', 'ATACseq_number_mapped_reads', 'ATACseq_tss_score', 'ATACseq_number_peaks_by_qvalue', 'RNAseq_number_mapped_reads', 'RNAseq_data_source']):
+        D = {}
+        S = []
+        for f in in_files:
+            k = f.split('_')[0]
+            df = pd.read_table(f, header=None, sep='\t')
+            D[k] = {s:'Yes' for s in df.iloc[:, 0]}
+            S += D[k]
+        for f in in_files2:
+            k = f.split('.txt')[0]
+            df = pd.read_table(f, header=0, sep='\t')
+            D[k] = dict(zip(df.iloc[:, 0], df.iloc[:, 1]))
+            S += df.iloc[:, 0].tolist()
+        for f in in_files3:
+            k = f.split('.txt')[0]
+            df = pd.read_table(f, header=0, sep='\t')
+            D[k] = dict(zip(df.iloc[:, 1], df.iloc[:, 2]))
+            S += df.iloc[:, 1].tolist()
+        S = sorted(set(S))
+
+        Ls = []
+        for sample in S:
+            L = []
+            for col in cols[1:]:
+                val = 'N/A'
+                if col in D:
+                    if sample in D[col]:
+                        val = D[col][sample]
+                L.append(val)
+            Ls.append([sample] + L)
+        df = pd.DataFrame(Ls, columns=cols)
+        df['sort'] = df.iloc[:, 1:5].apply(lambda x: ''.join(['1' if i == 'Yes' else '0' for i in x]), axis=1)
+        df.sort_values(['sort', 'donor_id'], ascending=[False, True], inplace=True)
+        df.drop(columns=['sort'], inplace=True)
+        df.to_csv(out_file, index=False, sep='\t')
 
     def get_number_raw_peaks(self, in_dirs, out_file='caQTL_number_raw_peaks.txt'):
         L = []
