@@ -237,7 +237,7 @@ class QTL:
         df.to_csv(out_file, header=True, index=False, sep='\t')
         cmd = f'bgzip -f {out_file}; tabix -p bed {out_file}.gz'
         subprocess.run(cmd, shell=True)
-        print('bed file for QTLtools generated and indexed.')
+        print('bed file for QTLtools generated and indexed')
 
     def get_PCA_pcs(
         self,
@@ -309,7 +309,7 @@ class QTL:
         elif geno_file:
             df = df_geno.iloc[:n_pcs_geno, :]
         df.to_csv(out_file, header=True, index=False, sep=' ')
-        print(f'PCA pcs saved to {out_file}.')
+        print(f'PCA pcs saved to {out_file}')
 
     def get_PCA_scree_plot(
         self,
@@ -498,7 +498,7 @@ class QTL:
                         cmd = f'QTLtools cis --chunk {n} {n_chunks} --vcf {geno_file} --bed {pheno_file} --{qtl} {params[qtl]} --window {window_size}'
                     elif qtl == 'conditional':
                         if n == 0:
-                            print('Please make sure to run permutation analysis first to get the corresponding mapping file before the conditional analysis.')
+                            print('Please make sure to run permutation analysis first to get the corresponding mapping file before the conditional analysis')
                         mapping_file = f'{qtl_type}_permute-{params["permute"]}_w{window_size_name_str}_{out_suffix}.thresholds.txt'
                         cmd = f'QTLtools cis --chunk {n} {n_chunks} --vcf {geno_file} --bed {pheno_file} --mapping {mapping_file} --window {window_size}'
 

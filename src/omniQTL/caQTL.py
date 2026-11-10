@@ -114,7 +114,7 @@ class CAQTL(QTL, SeqQC):
                     else:
                         D[sample]['R'].append(line)
                 else:
-                    print(f'File {line} not found, skipping.')
+                    print(f'File {line} not found, skipping')
 
         with open(out_script, 'w') as out:
             for sample in sorted(D):
@@ -149,7 +149,7 @@ class CAQTL(QTL, SeqQC):
                     config['atac.fastqs_rep1_R1'] = D[sample]['R']
 
                 else:
-                    print(f'check fastq files for sample {sample}.')
+                    print(f'check fastq files for sample {sample}')
 
                 with open(out_json, 'w') as out2:
                     json.dump(config, out2, indent=4)
